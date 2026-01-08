@@ -1,62 +1,18 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
 # Nix
 result
 result-*
-.direnv/
 
-# Cache
-*.cache
+# Python
 __pycache__/
-.pytest_cache/
+*.py[cod]
+*.so
 
-# Test coverage
-.coverage
-htmlcov/
-*.cover
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
 
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.bak
-
-# Local configuration
-local.conf
+# Build artifacts
+*.o
+*.a

@@ -1,7 +1,0 @@
-# Python dependencies for nix-profile PackageKit backend
-
-# Brotli decompression for nix-data-db downloads
-brotli>=1.0.9
-
-# Note: sqlite3 is part of Python standard library
-# Note: json, subprocess, urllib are part of Python standard library
