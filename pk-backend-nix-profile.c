@@ -1,0 +1,338 @@
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*-
+ *
+ * Copyright (C) 2025 PackageKit Nix Backend Contributors
+ *
+ * Licensed under the GNU General Public License Version 2
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+
+/*
+ * PackageKit backend for Nix profile management
+ * 
+ * This is a thin C wrapper that spawns the nixProfileBackend.py Python script
+ * for all PackageKit operations. The Python backend handles:
+ * - Installing packages via `nix profile install`
+ * - Removing packages via `nix profile remove`
+ * - Updating packages via `nix profile upgrade`
+ * - Searching packages via AppStream/nix-data-db metadata
+ */
+
+#include <pk-backend.h>
+#include <pk-backend-spawn.h>
+
+static PkBackendSpawn *spawn;
+
+void
+pk_backend_start_job (PkBackend *backend, PkBackendJob *job)
+{
+	if (pk_backend_spawn_is_busy (spawn)) {
+		pk_backend_job_error_code (job,
+					   PK_ERROR_ENUM_LOCK_REQUIRED,
+					   "spawned backend requires lock");
+		return;
+	}
+}
+
+void
+pk_backend_initialize (GKeyFile *conf, PkBackend *backend)
+{
+	g_debug ("backend: initialize (nix-profile)");
+	spawn = pk_backend_spawn_new (conf);
+	pk_backend_spawn_set_name (spawn, "nix-profile");
+}
+
+void
+pk_backend_destroy (PkBackend *backend)
+{
+	g_debug ("backend: destroy");
+	g_object_unref (spawn);
+}
+
+PkBitfield
+pk_backend_get_groups (PkBackend *backend)
+{
+	return pk_bitfield_from_enums (
+		PK_GROUP_ENUM_ACCESSIBILITY,
+		PK_GROUP_ENUM_ACCESSORIES,
+		PK_GROUP_ENUM_ADMIN_TOOLS,
+		PK_GROUP_ENUM_COMMUNICATION,
+		PK_GROUP_ENUM_DESKTOP_GNOME,
+		PK_GROUP_ENUM_DESKTOP_KDE,
+		PK_GROUP_ENUM_DESKTOP_OTHER,
+		PK_GROUP_ENUM_DEVELOPMENT,
+		PK_GROUP_ENUM_DOCUMENTATION,
+		PK_GROUP_ENUM_EDUCATION,
+		PK_GROUP_ENUM_ELECTRONICS,
+		PK_GROUP_ENUM_FONTS,
+		PK_GROUP_ENUM_GAMES,
+		PK_GROUP_ENUM_GRAPHICS,
+		PK_GROUP_ENUM_INTERNET,
+		PK_GROUP_ENUM_LEGACY,
+		PK_GROUP_ENUM_LOCALIZATION,
+		PK_GROUP_ENUM_MAPS,
+		PK_GROUP_ENUM_MULTIMEDIA,
+		PK_GROUP_ENUM_NETWORK,
+		PK_GROUP_ENUM_OFFICE,
+		PK_GROUP_ENUM_OTHER,
+		PK_GROUP_ENUM_POWER_MANAGEMENT,
+		PK_GROUP_ENUM_PROGRAMMING,
+		PK_GROUP_ENUM_PUBLISHING,
+		PK_GROUP_ENUM_REPOS,
+		PK_GROUP_ENUM_SCIENCE,
+		PK_GROUP_ENUM_SECURITY,
+		PK_GROUP_ENUM_SERVERS,
+		PK_GROUP_ENUM_SYSTEM,
+		PK_GROUP_ENUM_VIRTUALIZATION,
+		PK_GROUP_ENUM_UNKNOWN,
+		-1);
+}
+
+PkBitfield
+pk_backend_get_filters (PkBackend *backend)
+{
+	return pk_bitfield_from_enums (
+		PK_FILTER_ENUM_INSTALLED,
+		PK_FILTER_ENUM_NOT_INSTALLED,
+		PK_FILTER_ENUM_GUI,
+		PK_FILTER_ENUM_NOT_GUI,
+		PK_FILTER_ENUM_APPLICATION,
+		PK_FILTER_ENUM_NOT_APPLICATION,
+		-1);
+}
+
+gchar **
+pk_backend_get_mime_types (PkBackend *backend)
+{
+	/* Nix doesn't really have installable file types like .deb or .rpm */
+	const gchar *mime_types[] = { NULL };
+	return g_strdupv ((gchar **) mime_types);
+}
+
+void
+pk_backend_cancel (PkBackend *backend, PkBackendJob *job)
+{
+	pk_backend_spawn_kill (spawn);
+}
+
+void
+pk_backend_get_details (PkBackend *backend, PkBackendJob *job, gchar **package_ids)
+{
+	gchar *package_ids_temp;
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-details", package_ids_temp, NULL);
+	g_free (package_ids_temp);
+}
+
+void
+pk_backend_get_details_local (PkBackend *backend, PkBackendJob *job, gchar **files)
+{
+	/* Not supported for nix profile */
+	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
+				   "get-details-local not supported");
+}
+
+void
+pk_backend_get_files (PkBackend *backend, PkBackendJob *job, gchar **package_ids)
+{
+	gchar *package_ids_temp;
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-files", package_ids_temp, NULL);
+	g_free (package_ids_temp);
+}
+
+void
+pk_backend_get_updates (PkBackend *backend, PkBackendJob *job, PkBitfield filters)
+{
+	gchar *filters_text;
+	filters_text = pk_filter_bitfield_to_string (filters);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-updates", filters_text, NULL);
+	g_free (filters_text);
+}
+
+void
+pk_backend_get_update_detail (PkBackend *backend, PkBackendJob *job, gchar **package_ids)
+{
+	gchar *package_ids_temp;
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-update-detail", package_ids_temp, NULL);
+	g_free (package_ids_temp);
+}
+
+void
+pk_backend_install_packages (PkBackend *backend, PkBackendJob *job, PkBitfield transaction_flags, gchar **package_ids)
+{
+	gchar *package_ids_temp;
+	gchar *transaction_flags_temp;
+
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "install-packages", transaction_flags_temp, package_ids_temp, NULL);
+	g_free (package_ids_temp);
+	g_free (transaction_flags_temp);
+}
+
+void
+pk_backend_install_files (PkBackend *backend, PkBackendJob *job, PkBitfield transaction_flags, gchar **full_paths)
+{
+	/* Not supported for nix profile */
+	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
+				   "install-files not supported - use nix profile install directly");
+}
+
+void
+pk_backend_refresh_cache (PkBackend *backend, PkBackendJob *job, gboolean force)
+{
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "refresh-cache",
+				 pk_backend_bool_to_string (force), NULL);
+}
+
+void
+pk_backend_remove_packages (PkBackend *backend, PkBackendJob *job, PkBitfield transaction_flags, gchar **package_ids, gboolean allow_deps, gboolean autoremove)
+{
+	gchar *package_ids_temp;
+	gchar *transaction_flags_temp;
+
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "remove-packages",
+				 transaction_flags_temp,
+				 package_ids_temp,
+				 pk_backend_bool_to_string (allow_deps),
+				 pk_backend_bool_to_string (autoremove),
+				 NULL);
+	g_free (package_ids_temp);
+	g_free (transaction_flags_temp);
+}
+
+void
+pk_backend_resolve (PkBackend *backend, PkBackendJob *job, PkBitfield filters, gchar **packages)
+{
+	gchar *filters_text;
+	gchar *packages_temp;
+
+	filters_text = pk_filter_bitfield_to_string (filters);
+	packages_temp = g_strjoinv ("&", packages);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "resolve", filters_text, packages_temp, NULL);
+	g_free (filters_text);
+	g_free (packages_temp);
+}
+
+void
+pk_backend_search_details (PkBackend *backend, PkBackendJob *job, PkBitfield filters, gchar **values)
+{
+	gchar *filters_text;
+	gchar *search;
+
+	filters_text = pk_filter_bitfield_to_string (filters);
+	search = g_strjoinv ("&", values);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-details", filters_text, search, NULL);
+	g_free (filters_text);
+	g_free (search);
+}
+
+void
+pk_backend_search_files (PkBackend *backend, PkBackendJob *job, PkBitfield filters, gchar **values)
+{
+	gchar *filters_text;
+	gchar *search;
+
+	filters_text = pk_filter_bitfield_to_string (filters);
+	search = g_strjoinv ("&", values);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-files", filters_text, search, NULL);
+	g_free (filters_text);
+	g_free (search);
+}
+
+void
+pk_backend_search_groups (PkBackend *backend, PkBackendJob *job, PkBitfield filters, gchar **values)
+{
+	gchar *filters_text;
+	gchar *search;
+
+	filters_text = pk_filter_bitfield_to_string (filters);
+	search = g_strjoinv ("&", values);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-groups", filters_text, search, NULL);
+	g_free (filters_text);
+	g_free (search);
+}
+
+void
+pk_backend_search_names (PkBackend *backend, PkBackendJob *job, PkBitfield filters, gchar **values)
+{
+	gchar *filters_text;
+	gchar *search;
+
+	filters_text = pk_filter_bitfield_to_string (filters);
+	search = g_strjoinv ("&", values);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-names", filters_text, search, NULL);
+	g_free (filters_text);
+	g_free (search);
+}
+
+void
+pk_backend_update_packages (PkBackend *backend, PkBackendJob *job, PkBitfield transaction_flags, gchar **package_ids)
+{
+	gchar *package_ids_temp;
+	gchar *transaction_flags_temp;
+
+	package_ids_temp = pk_package_ids_to_string (package_ids);
+	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "update-packages", transaction_flags_temp, package_ids_temp, NULL);
+	g_free (package_ids_temp);
+	g_free (transaction_flags_temp);
+}
+
+void
+pk_backend_get_packages (PkBackend *backend, PkBackendJob *job, PkBitfield filters)
+{
+	gchar *filters_text;
+	filters_text = pk_filter_bitfield_to_string (filters);
+	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-packages", filters_text, NULL);
+	g_free (filters_text);
+}
+
+void
+pk_backend_get_repo_list (PkBackend *backend, PkBackendJob *job, PkBitfield filters)
+{
+	/* Nix doesn't have traditional repos - channels are handled differently */
+	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
+				   "Nix uses flakes/channels, not traditional repos");
+}
+
+void
+pk_backend_repo_enable (PkBackend *backend, PkBackendJob *job, const gchar *repo_id, gboolean enabled)
+{
+	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
+				   "Nix uses flakes/channels, not traditional repos");
+}
+
+const gchar *
+pk_backend_get_description (PkBackend *backend)
+{
+	return "Nix Profile";
+}
+
+const gchar *
+pk_backend_get_author (PkBackend *backend)
+{
+	return "PackageKit Nix Backend Contributors";
+}
+
+gboolean
+pk_backend_supports_parallelization (PkBackend *backend)
+{
+	return FALSE;
+}

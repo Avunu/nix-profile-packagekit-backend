@@ -1,0 +1,70 @@
+{
+  description = "PackageKit backend for Nix profile management - enables GNOME Software / KDE Discover";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    
+    # Data repositories from snowfallorg
+    nix-data-db = {
+      url = "github:snowfallorg/nix-data-db";
+      flake = false;
+    };
+    nixos-appstream-data = {
+      url = "github:snowfallorg/nixos-appstream-data";
+      flake = false;
+    };
+  };
+
+  outputs = { self, nixpkgs, flake-utils, nix-data-db, nixos-appstream-data, ... }:
+    let
+      # Overlay that provides the backend package
+      overlay = final: prev: {
+        packagekit-backend-nix-profile = final.callPackage ./package.nix {
+          inherit nix-data-db nixos-appstream-data;
+        };
+      };
+    in
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ overlay ];
+        };
+      in
+      {
+        packages = {
+          default = pkgs.packagekit-backend-nix-profile;
+          backend = pkgs.packagekit-backend-nix-profile;
+        };
+
+        # Development shell
+        devShells.default = pkgs.mkShell {
+          packages = with pkgs; [
+            python3
+            python3Packages.brotli
+            pkg-config
+            glib
+            packagekit
+          ];
+          
+          shellHook = ''
+            echo "PackageKit Nix Profile Backend Development"
+            echo ""
+            echo "Build:   nix build"
+            echo "Test:    ./test_backend.py"
+            echo ""
+          '';
+        };
+
+        formatter = pkgs.nixpkgs-fmt;
+      }
+    ) // {
+      # NixOS module for easy integration
+      nixosModules.default = import ./module.nix;
+      nixosModules.nix-profile-backend = import ./module.nix;
+      
+      # Overlay for use in other flakes
+      overlays.default = overlay;
+    };
+}
