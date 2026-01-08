@@ -4,6 +4,7 @@
 , pkg-config
 , glib
 , packagekit
+, fetchFromGitHub
 , nix-data-db
 , nixos-appstream-data
 }:
@@ -15,6 +16,14 @@ let
   ]);
   
   backendName = "nix-profile";
+  
+  # Fetch PackageKit source for backend headers (not installed by default)
+  packagekitSrc = fetchFromGitHub {
+    owner = "PackageKit";
+    repo = "PackageKit";
+    rev = "v1.3.0";  # Match nixpkgs version
+    hash = "sha256-MYZFI1Q90F/AXVSJJBhmw+E7IMLXrdwmSuFJwv5D/z4=";
+  };
   
 in stdenv.mkDerivation {
   pname = "packagekit-backend-nix-profile";
@@ -59,9 +68,13 @@ in stdenv.mkDerivation {
     
     # Compile the C backend shim
     # This creates libpk_backend_nix-profile.so
+    # We use headers from PackageKit source since backend headers aren't installed
+    # -DPK_COMPILATION allows including internal headers
     ${stdenv.cc}/bin/cc -shared -fPIC \
       $(pkg-config --cflags glib-2.0 packagekit-glib2) \
-      -I${packagekit}/include/PackageKit/backend \
+      -I${packagekitSrc}/src \
+      -I${packagekitSrc}/lib/packagekit-glib2 \
+      -DPK_COMPILATION \
       -DG_LOG_DOMAIN=\"PackageKit-Backend-nix-profile\" \
       -o libpk_backend_nix-profile.so \
       pk-backend-nix-profile.c \
