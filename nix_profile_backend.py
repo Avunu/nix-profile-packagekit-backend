@@ -38,7 +38,43 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from packagekit.backend import PackageKitBaseBackend, get_package_id, split_package_id
 from packagekit.package import PackagekitPackage
-from packagekit.enums import *
+from packagekit.enums import (
+    # Errors
+    ERROR_INTERNAL_ERROR,
+    ERROR_NOT_SUPPORTED,
+    ERROR_PACKAGE_FAILED_TO_INSTALL,
+    ERROR_PACKAGE_FAILED_TO_REMOVE,
+    ERROR_PACKAGE_NOT_FOUND,
+    # Groups
+    GROUP_ACCESSORIES,
+    GROUP_ADMIN_TOOLS,
+    GROUP_EDUCATION,
+    GROUP_GAMES,
+    GROUP_GRAPHICS,
+    GROUP_INTERNET,
+    GROUP_MULTIMEDIA,
+    GROUP_OFFICE,
+    GROUP_PROGRAMMING,
+    GROUP_SCIENCE,
+    GROUP_SYSTEM,
+    GROUP_UNKNOWN,
+    # Info
+    INFO_AVAILABLE,
+    INFO_INSTALLED,
+    INFO_NORMAL,
+    INFO_REMOVING,
+    INFO_UPDATING,
+    # Misc
+    RESTART_NONE,
+    UPDATE_STATE_STABLE,
+    # Status
+    STATUS_INFO,
+    STATUS_INSTALL,
+    STATUS_QUERY,
+    STATUS_REFRESH_CACHE,
+    STATUS_REMOVE,
+    STATUS_UPDATE,
+)
 
 # Import helper modules
 from nix_profile import NixProfile
@@ -181,9 +217,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
                 parser = NixLogParser(self._update_progress)
                 
                 # Read stderr (where nix logs go) line by line
-                for line in process.stderr:
-                    stderr_lines.append(line)
-                    parser.parse_line(line.strip())
+                if process.stderr:
+                    for line in process.stderr:
+                        stderr_lines.append(line)
+                        parser.parse_line(line.strip())
             
             stdout, remaining_stderr = process.communicate()
             stdout_lines.append(stdout)
@@ -218,8 +255,8 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         """
         return get_package_id(pkg_name, version or "unknown", arch, "nixpkgs")
     
-    def _parse_package_id(self, package_id: str) -> Tuple[str, str, str, str]:
-        """Parse a PackageKit package ID."""
+    def _parse_package_id(self, package_id: str) -> List[str]:
+        """Parse a PackageKit package ID into [name, version, arch, data]."""
         return split_package_id(package_id)
     
     def _get_package_metadata(self, pkg_name: str) -> Optional[Dict]:
@@ -434,7 +471,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
                 # Re-emit the package as installed
                 self._emit_package(pkg_name, version, INFO_INSTALLED)
             else:
-                self.error(ERROR_PACKAGE_INSTALL_FAILED, 
+                self.error(ERROR_PACKAGE_FAILED_TO_INSTALL, 
                           f"Failed to install {pkg_name}: {stderr}")
     
     def refresh_cache(self, force):
@@ -449,9 +486,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
             'registry', 'pin', 'nixpkgs'
         ], parse_json=False)
         
-        if rc != 0:
-            self.message(MESSAGE_CACHE_BEING_REBUILT, 
-                        "Failed to update nixpkgs registry, continuing anyway")
+        # Note: registry pin failure is non-fatal, we continue anyway
         
         # nix search always uses fresh data, no appdata cache needed
         self.percentage(100)
@@ -485,7 +520,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
                 self.percentage(100)
                 self._emit_package(pkg_name, version, INFO_REMOVING)
             else:
-                self.error(ERROR_PACKAGE_REMOVE_FAILED,
+                self.error(ERROR_PACKAGE_FAILED_TO_REMOVE,
                           f"Failed to remove {pkg_name}: {stderr}")
     
     def resolve(self, filters, packages):
@@ -644,7 +679,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
                 new_version = installed.get(pkg_name, version)
                 self._emit_package(pkg_name, new_version, INFO_UPDATING)
             else:
-                self.error(ERROR_PACKAGE_UPDATE_FAILED,
+                self.error(ERROR_PACKAGE_FAILED_TO_INSTALL,
                           f"Failed to update {pkg_name}: {stderr}")
     
     def update_system(self, transaction_flags):
@@ -661,7 +696,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         if rc == 0:
             self.percentage(100)
         else:
-            self.error(ERROR_PACKAGE_UPDATE_FAILED,
+            self.error(ERROR_PACKAGE_FAILED_TO_INSTALL,
                       f"Failed to upgrade profile: {stderr}")
     
     def get_packages(self, filters):
