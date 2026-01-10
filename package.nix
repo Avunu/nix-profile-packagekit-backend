@@ -96,8 +96,7 @@ stdenv.mkDerivation {
         # Install actual Python backend and modules
         cp nix_profile_backend.py $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py.real
         cp nix_profile.py $out/share/PackageKit/helpers/${backendName}/
-        cp nixpkgs_appdata.py $out/share/PackageKit/helpers/${backendName}/
-        cp appstream_parser.py $out/share/PackageKit/helpers/${backendName}/
+        cp nix_search.py $out/share/PackageKit/helpers/${backendName}/
         
         # Install PackageKit Python library from upstream source
         mkdir -p $out/share/PackageKit/helpers/${backendName}/packagekit
