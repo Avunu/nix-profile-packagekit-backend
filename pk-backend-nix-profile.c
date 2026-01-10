@@ -22,7 +22,7 @@
 /*
  * PackageKit backend for Nix profile management
  * 
- * This is a thin C wrapper that spawns the nixProfileBackend.py Python script
+ * This is a thin C wrapper that spawns the nix_profile_backend.py Python script
  * for all PackageKit operations. The Python backend handles:
  * - Installing packages via `nix profile install`
  * - Removing packages via `nix profile remove`
@@ -132,7 +132,7 @@ pk_backend_get_details (PkBackend *backend, PkBackendJob *job, gchar **package_i
 {
 	gchar *package_ids_temp;
 	package_ids_temp = pk_package_ids_to_string (package_ids);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-details", package_ids_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "get-details", package_ids_temp, NULL);
 	g_free (package_ids_temp);
 }
 
@@ -149,7 +149,7 @@ pk_backend_get_files (PkBackend *backend, PkBackendJob *job, gchar **package_ids
 {
 	gchar *package_ids_temp;
 	package_ids_temp = pk_package_ids_to_string (package_ids);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-files", package_ids_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "get-files", package_ids_temp, NULL);
 	g_free (package_ids_temp);
 }
 
@@ -158,7 +158,7 @@ pk_backend_get_updates (PkBackend *backend, PkBackendJob *job, PkBitfield filter
 {
 	gchar *filters_text;
 	filters_text = pk_filter_bitfield_to_string (filters);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-updates", filters_text, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "get-updates", filters_text, NULL);
 	g_free (filters_text);
 }
 
@@ -167,7 +167,7 @@ pk_backend_get_update_detail (PkBackend *backend, PkBackendJob *job, gchar **pac
 {
 	gchar *package_ids_temp;
 	package_ids_temp = pk_package_ids_to_string (package_ids);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-update-detail", package_ids_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "get-update-detail", package_ids_temp, NULL);
 	g_free (package_ids_temp);
 }
 
@@ -179,7 +179,7 @@ pk_backend_install_packages (PkBackend *backend, PkBackendJob *job, PkBitfield t
 
 	package_ids_temp = pk_package_ids_to_string (package_ids);
 	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "install-packages", transaction_flags_temp, package_ids_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "install-packages", transaction_flags_temp, package_ids_temp, NULL);
 	g_free (package_ids_temp);
 	g_free (transaction_flags_temp);
 }
@@ -195,7 +195,7 @@ pk_backend_install_files (PkBackend *backend, PkBackendJob *job, PkBitfield tran
 void
 pk_backend_refresh_cache (PkBackend *backend, PkBackendJob *job, gboolean force)
 {
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "refresh-cache",
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "refresh-cache",
 				 pk_backend_bool_to_string (force), NULL);
 }
 
@@ -207,7 +207,7 @@ pk_backend_remove_packages (PkBackend *backend, PkBackendJob *job, PkBitfield tr
 
 	package_ids_temp = pk_package_ids_to_string (package_ids);
 	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "remove-packages",
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "remove-packages",
 				 transaction_flags_temp,
 				 package_ids_temp,
 				 pk_backend_bool_to_string (allow_deps),
@@ -225,7 +225,7 @@ pk_backend_resolve (PkBackend *backend, PkBackendJob *job, PkBitfield filters, g
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	packages_temp = g_strjoinv ("&", packages);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "resolve", filters_text, packages_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "resolve", filters_text, packages_temp, NULL);
 	g_free (filters_text);
 	g_free (packages_temp);
 }
@@ -238,7 +238,7 @@ pk_backend_search_details (PkBackend *backend, PkBackendJob *job, PkBitfield fil
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-details", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-details", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -251,7 +251,7 @@ pk_backend_search_files (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-files", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-files", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -264,7 +264,7 @@ pk_backend_search_groups (PkBackend *backend, PkBackendJob *job, PkBitfield filt
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-groups", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-groups", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -277,7 +277,7 @@ pk_backend_search_names (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "search-names", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-names", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -290,7 +290,7 @@ pk_backend_update_packages (PkBackend *backend, PkBackendJob *job, PkBitfield tr
 
 	package_ids_temp = pk_package_ids_to_string (package_ids);
 	transaction_flags_temp = pk_transaction_flag_bitfield_to_string (transaction_flags);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "update-packages", transaction_flags_temp, package_ids_temp, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "update-packages", transaction_flags_temp, package_ids_temp, NULL);
 	g_free (package_ids_temp);
 	g_free (transaction_flags_temp);
 }
@@ -300,7 +300,7 @@ pk_backend_get_packages (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 {
 	gchar *filters_text;
 	filters_text = pk_filter_bitfield_to_string (filters);
-	pk_backend_spawn_helper (spawn, job, "nixProfileBackend.py", "get-packages", filters_text, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "get-packages", filters_text, NULL);
 	g_free (filters_text);
 }
 

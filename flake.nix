@@ -4,28 +4,32 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    
-    # Data repositories from snowfallorg
-    nix-data-db = {
-      url = "github:snowfallorg/nix-data-db";
-      flake = false;
-    };
-    nixos-appstream-data = {
-      url = "github:snowfallorg/nixos-appstream-data";
+
+    # PackageKit source for backend headers and Python library
+    packagekit-src = {
+      url = "github:PackageKit/PackageKit/v1.3.0";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix-data-db, nixos-appstream-data, ... }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      packagekit-src,
+      ...
+    }:
     let
       # Overlay that provides the backend package
       overlay = final: prev: {
         packagekit-backend-nix-profile = final.callPackage ./package.nix {
-          inherit nix-data-db nixos-appstream-data;
+          packagekitSrc = packagekit-src;
         };
       };
     in
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -47,7 +51,7 @@
             glib
             packagekit
           ];
-          
+
           shellHook = ''
             echo "PackageKit Nix Profile Backend Development"
             echo ""
@@ -59,11 +63,12 @@
 
         formatter = pkgs.nixpkgs-fmt;
       }
-    ) // {
+    )
+    // {
       # NixOS module for easy integration
       nixosModules.default = import ./module.nix;
       nixosModules.nix-profile-backend = import ./module.nix;
-      
+
       # Overlay for use in other flakes
       overlays.default = overlay;
     };

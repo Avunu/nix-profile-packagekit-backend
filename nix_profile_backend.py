@@ -42,7 +42,7 @@ from packagekit.enums import *
 
 # Import helper modules
 from nix_profile import NixProfile
-from nixpkgs_appdata import NixpkgsAppdata
+from nix_search import NixSearch
 
 
 class NixLogParser:
@@ -140,8 +140,8 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         # Initialize nix profile manager
         self.profile = NixProfile()
         
-        # Initialize appdata manager
-        self.appdata = NixpkgsAppdata()
+        # Initialize nix search for package lookups
+        self.nix_search = NixSearch()
         
         # Cache for package metadata
         self._metadata_cache = {}
@@ -235,7 +235,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         if pkg_name in self._metadata_cache:
             return self._metadata_cache[pkg_name]
         
-        metadata = self.appdata.get_package_metadata(pkg_name)
+        metadata = self.nix_search.get_package_info(pkg_name)
         if metadata:
             self._metadata_cache[pkg_name] = metadata
         
@@ -453,13 +453,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
             self.message(MESSAGE_CACHE_BEING_REBUILT, 
                         "Failed to update nixpkgs registry, continuing anyway")
         
-        # Download/update appdata
-        self.percentage(50)
-        try:
-            self.appdata.refresh_cache(force)
-        except Exception as e:
-            self.error(ERROR_INTERNAL_ERROR, f"Failed to refresh appdata: {str(e)}")
-        
+        # nix search always uses fresh data, no appdata cache needed
         self.percentage(100)
     
     def remove_packages(self, transaction_flags, package_ids, allowdeps, autoremove):
@@ -521,7 +515,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         self.allow_cancel(True)
         
         search_terms = [v.lower() for v in values]
-        results = self.appdata.search_packages(search_terms, search_descriptions=True)
+        results = self.nix_search.search(search_terms)
         
         installed = self.profile.get_installed_packages()
         
@@ -572,7 +566,9 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         if not categories:
             return
         
-        results = self.appdata.search_by_category(categories)
+        # nix search doesn't support categories natively, so search by category names as terms
+        # This is a best-effort approximation
+        results = self.nix_search.search(categories)
         installed = self.profile.get_installed_packages()
         
         total = len(results)
@@ -597,7 +593,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
         self.allow_cancel(True)
         
         search_terms = [v.lower() for v in values]
-        results = self.appdata.search_packages(search_terms, search_descriptions=False)
+        results = self.nix_search.search(search_terms)
         
         installed = self.profile.get_installed_packages()
         
