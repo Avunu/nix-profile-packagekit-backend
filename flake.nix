@@ -47,6 +47,7 @@
           packages = with pkgs; [
             python3
             python3Packages.brotli
+            pyright # Type checker
             pkg-config
             glib
             packagekit
@@ -58,6 +59,10 @@
             echo "Build:   nix build"
             echo "Test:    ./test_backend.py"
             echo ""
+            
+            # Add PackageKit Python modules to PYTHONPATH for typechecking
+            # Uses the packaged version from nixpkgs which includes enums.py
+            export PYTHONPATH="${pkgs.packagekit}/lib/python3.13/site-packages:$PYTHONPATH"
           '';
         };
 

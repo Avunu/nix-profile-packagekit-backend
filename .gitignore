@@ -16,3 +16,6 @@ __pycache__/
 # Build artifacts
 *.o
 *.a
+
+# direnv
+.direnv/
