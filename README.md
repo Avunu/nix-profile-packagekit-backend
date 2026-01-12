@@ -6,12 +6,8 @@ A PackageKit backend that enables **GNOME Software**, **KDE Discover**, and othe
 
 - **Browse & Install** packages from nixpkgs through your favorite software center
 - **User-level operations** - no root required, all changes go to `~/.nix-profile`
-- **Rich metadata** via [snowfallorg](https://github.com/snowfallorg) AppStream data
+- **Always fresh data** - uses native `nix search` at runtime, no stale caches
 - **Modern Nix** - uses `nix profile` commands (Nix 2.4+)
-
-## Screenshots
-
-*(Coming soon - GNOME Software showing nixpkgs packages)*
 
 ## Installation
 
@@ -23,7 +19,7 @@ Add to your `flake.nix`:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nix-profile-backend.url = "github:YOURUSER/packagekit-nix-profile-backend";
+    nix-profile-backend.url = "github:YOURUSER/nix-profile-packagekit-backend";
   };
 
   outputs = { nixpkgs, nix-profile-backend, ... }: {
@@ -32,7 +28,7 @@ Add to your `flake.nix`:
       modules = [
         nix-profile-backend.nixosModules.default
         {
-          services.packagekit-nix-profile.enable = true;
+          services.packagekit.backends.nix-profile.enable = true;
         }
       ];
     };
@@ -52,7 +48,7 @@ sudo nixos-rebuild switch
 nix build
 
 # Test the Python backend directly
-printf 'get-packages\tinstalled\n' | result/share/PackageKit/helpers/nix-profile/nixProfileBackend.py
+printf 'get-packages\tinstalled\n' | result/share/PackageKit/helpers/nix-profile/nix_profile_backend.py
 ```
 
 ## How It Works
@@ -60,13 +56,42 @@ printf 'get-packages\tinstalled\n' | result/share/PackageKit/helpers/nix-profile
 This backend follows PackageKit's **spawned backend** architecture:
 
 1. **C Shim** (`libpk_backend_nix-profile.so`) - Loaded by PackageKit daemon
-2. **Python Backend** (`nixProfileBackend.py`) - Spawned for each operation, communicates via stdin/stdout
+2. **Python Backend** (`nix_profile_backend.py`) - Spawned for each operation
 
-Package operations map to `nix profile` commands:
+Package operations map to `nix` commands:
 - `install-packages` → `nix profile install nixpkgs#<package>`
 - `remove-packages` → `nix profile remove <index>`
 - `get-packages` → Parses `~/.nix-profile/manifest.json`
-- `search-name` → Queries AppStream catalog
+- `search-*` → `nix search nixpkgs <term> --json`
+
+## Architecture
+
+```
+┌─────────────────────┐
+│   GNOME Software    │
+│   KDE Discover      │
+└─────────┬───────────┘
+          │ D-Bus
+┌─────────▼───────────┐
+│  PackageKit Daemon  │
+└─────────┬───────────┘
+          │ dlopen
+┌─────────▼───────────┐
+│ libpk_backend_      │
+│ nix-profile.so      │  (C shim)
+└─────────┬───────────┘
+          │ spawn
+┌─────────▼───────────┐
+│ nix_profile_        │
+│ backend.py          │  (Python backend)
+└─────────┬───────────┘
+          │ subprocess
+┌─────────▼───────────┐
+│  nix profile        │
+│  nix search         │
+│  nix eval           │
+└─────────────────────┘
+```
 
 ## Requirements
 
@@ -74,18 +99,12 @@ Package operations map to `nix profile` commands:
 - PackageKit (automatically satisfied on most desktop NixOS configs)
 - A PackageKit client (GNOME Software, KDE Discover, etc.)
 
-## Data Sources
-
-This backend uses data from [snowfallorg](https://github.com/snowfallorg):
-
-- **[nix-data-db](https://github.com/snowfallorg/nix-data-db)** - Package metadata (versions, descriptions)
-- **[nixos-appstream-data](https://github.com/snowfallorg/nixos-appstream-data)** - AppStream catalog (icons, screenshots, categories)
-
 ## Limitations
 
+- **Search speed**: `nix search` evaluates nixpkgs, which takes a few seconds
 - **Dependencies**: Nix profile doesn't expose dependency information to PackageKit
 - **System packages**: Only manages user profile, not NixOS system configuration
-- **Atomic updates**: Each install/remove is separate (use `nix profile upgrade` for atomic bulk updates)
+- **Categories**: Category browsing is limited (nix doesn't have native categories)
 
 ## Development
 
@@ -108,5 +127,4 @@ GPL-2.0-or-later (matching PackageKit)
 ## Credits
 
 - [PackageKit](https://github.com/PackageKit/PackageKit) - The package management abstraction layer
-- [snowfallorg](https://github.com/snowfallorg) - Nix package metadata and AppStream data
 - Inspired by PackageKit's pisi backend architecture

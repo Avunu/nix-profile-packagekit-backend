@@ -5,7 +5,7 @@
   pkg-config,
   glib,
   packagekit,
-  nix,
+  nix-search-cli,
   packagekitSrc,
 }:
 
@@ -85,10 +85,11 @@ stdenv.mkDerivation {
         # Install Python backend to helpers directory
         mkdir -p $out/share/PackageKit/helpers/${backendName}
         
-        # Create wrapper script that sets PYTHONPATH and runs backend
+        # Create wrapper script that sets PYTHONPATH and PATH for runtime dependencies
         cat > $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py << EOF
     #!/bin/sh
     export PYTHONPATH="$out/share/PackageKit/helpers/${backendName}:\$PYTHONPATH"
+    export PATH="${nix-search-cli}/bin:\$PATH"
     exec ${pythonEnv}/bin/python3 $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py.real "\$@"
     EOF
         chmod +x $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py
