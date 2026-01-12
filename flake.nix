@@ -35,6 +35,15 @@
           inherit system;
           overlays = [ overlay ];
         };
+
+        # Python environment with all dependencies for development
+        # This creates a wrapped Python with packages in sys.path
+        pythonEnv = pkgs.python3.withPackages (ps: [
+          ps.brotli
+          # PackageKit has Python bindings in lib/python*/site-packages/
+          # toPythonModule lets withPackages pick them up
+          (ps.toPythonModule pkgs.packagekit)
+        ]);
       in
       {
         packages = {
@@ -44,13 +53,12 @@
 
         # Development shell
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [
-            python3
-            python3Packages.brotli
-            pyright # Type checker
-            pkg-config
-            glib
-            packagekit
+          packages = [
+            pythonEnv
+            pkgs.pyright
+            pkgs.pkg-config
+            pkgs.glib
+            pkgs.packagekit
           ];
 
           shellHook = ''
@@ -59,10 +67,6 @@
             echo "Build:   nix build"
             echo "Test:    ./test_backend.py"
             echo ""
-            
-            # Add PackageKit Python modules to PYTHONPATH for typechecking
-            # Uses the packaged version from nixpkgs which includes enums.py
-            export PYTHONPATH="${pkgs.packagekit}/lib/python3.13/site-packages:$PYTHONPATH"
           '';
         };
 

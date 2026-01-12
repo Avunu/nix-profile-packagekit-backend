@@ -8,7 +8,6 @@ __pycache__/
 *.so
 
 # Editors
-.vscode/
 .idea/
 *.swp
 *~
@@ -17,5 +16,7 @@ __pycache__/
 *.o
 *.a
 
-# direnv
+# direnv-generated (regenerated on shell entry)
 .direnv/
+.venv/
+.vscode/
