@@ -23,6 +23,8 @@ class NixSearch:
     
     This is much faster than `nix search` because it uses a pre-built
     ElasticSearch index rather than evaluating nixpkgs.
+    
+    Requires nix-search-cli to be installed (bundled via flake.nix).
     """
     
     def __init__(self, channel: str = "unstable"):
@@ -34,27 +36,6 @@ class NixSearch:
         """
         self.channel = channel
         self._cache: Dict[str, Dict] = {}
-        
-        # Command to run nix-search - try system binary first, fall back to nix run
-        self._nix_search_cmd = self._find_nix_search()
-    
-    def _find_nix_search(self) -> List[str]:
-        """Find the nix-search command."""
-        # Try system-installed nix-search first
-        try:
-            result = subprocess.run(
-                ['which', 'nix-search'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                return ['nix-search']
-        except Exception:
-            pass
-        
-        # Fall back to nix run
-        return ['nix', 'run', 'github:peterldowns/nix-search-cli', '--']
     
     def search(self, terms: List[str], limit: int = 100) -> Dict[str, Dict]:
         """
@@ -71,7 +52,8 @@ class NixSearch:
         search_query = ' '.join(terms)
         
         try:
-            cmd = self._nix_search_cmd + [
+            cmd = [
+                'nix-search',
                 '--search', search_query,
                 '--channel', self.channel,
                 '--max-results', str(limit),
@@ -116,7 +98,8 @@ class NixSearch:
         results = {}
         
         try:
-            cmd = self._nix_search_cmd + [
+            cmd = [
+                'nix-search',
                 '--name', name,
                 '--channel', self.channel,
                 '--max-results', str(limit),
@@ -154,7 +137,8 @@ class NixSearch:
         results = {}
         
         try:
-            cmd = self._nix_search_cmd + [
+            cmd = [
+                'nix-search',
                 '--program', program,
                 '--channel', self.channel,
                 '--max-results', str(limit),

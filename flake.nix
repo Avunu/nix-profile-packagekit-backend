@@ -59,6 +59,7 @@
             pkgs.pkg-config
             pkgs.glib
             pkgs.packagekit
+            pkgs.nix-search-cli
           ];
 
           shellHook = ''
