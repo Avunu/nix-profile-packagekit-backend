@@ -3,13 +3,13 @@
 #
 # Licensed under the GNU General Public License Version 2
 #
-# Nix search integration for PackageKit backend
+# Nix search integration for PackageKit backend using nix-search-cli
 
 """
-Module for searching nixpkgs packages using native nix commands.
+Module for searching nixpkgs packages using nix-search-cli.
 
-Uses `nix search` at runtime - always up-to-date with the current flake registry.
-No external databases or build-time dependencies required.
+Uses search.nixos.org ElasticSearch index via nix-search-cli for instant results.
+https://github.com/peterldowns/nix-search-cli
 """
 
 import json
@@ -19,23 +19,42 @@ from typing import Dict, List, Optional, Tuple
 
 class NixSearch:
     """
-    Search nixpkgs using native `nix search` command.
+    Search nixpkgs using nix-search-cli (queries search.nixos.org).
     
-    This approach:
-    - Always uses current nixpkgs from flake registry
-    - No build-time data dependencies
-    - No cache staleness issues
+    This is much faster than `nix search` because it uses a pre-built
+    ElasticSearch index rather than evaluating nixpkgs.
     """
     
-    def __init__(self, flake_ref: str = "nixpkgs"):
+    def __init__(self, channel: str = "unstable"):
         """
         Initialize the nix search wrapper.
         
         Args:
-            flake_ref: Flake reference to search (default: "nixpkgs" from registry)
+            channel: Channel to search (default: "unstable")
         """
-        self.flake_ref = flake_ref
+        self.channel = channel
         self._cache: Dict[str, Dict] = {}
+        
+        # Command to run nix-search - try system binary first, fall back to nix run
+        self._nix_search_cmd = self._find_nix_search()
+    
+    def _find_nix_search(self) -> List[str]:
+        """Find the nix-search command."""
+        # Try system-installed nix-search first
+        try:
+            result = subprocess.run(
+                ['which', 'nix-search'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                return ['nix-search']
+        except Exception:
+            pass
+        
+        # Fall back to nix run
+        return ['nix', 'run', 'github:peterldowns/nix-search-cli', '--']
     
     def search(self, terms: List[str], limit: int = 100) -> Dict[str, Dict]:
         """
@@ -46,54 +65,154 @@ class NixSearch:
             limit: Maximum results to return
             
         Returns:
-            Dictionary mapping package attribute paths to metadata
+            Dictionary mapping package attribute names to metadata
         """
         results = {}
+        search_query = ' '.join(terms)
         
-        for term in terms:
-            try:
-                # Run nix search with JSON output
-                result = subprocess.run(
-                    ['nix', 'search', self.flake_ref, term, '--json'],
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
-                
-                if result.returncode != 0:
-                    print(f"nix search failed: {result.stderr}")
+        try:
+            cmd = self._nix_search_cmd + [
+                '--search', search_query,
+                '--channel', self.channel,
+                '--max-results', str(limit),
+                '--json'
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                print(f"nix-search failed: {result.stderr}")
+                return {}
+            
+            # Parse JSON lines output
+            for line in result.stdout.strip().split('\n'):
+                if not line:
                     continue
-                
-                if not result.stdout.strip():
+                try:
+                    pkg = json.loads(line)
+                    attr_name = pkg.get('package_attr_name', '')
+                    if not attr_name:
+                        continue
+                    
+                    results[attr_name] = self._parse_package(pkg)
+                    
+                except json.JSONDecodeError:
                     continue
-                
-                packages = json.loads(result.stdout)
-                
-                for attr_path, info in packages.items():
-                    # attr_path is like "legacyPackages.x86_64-linux.firefox"
-                    # Extract just the package name
-                    parts = attr_path.split('.')
-                    pkg_name = parts[-1] if parts else attr_path
                     
-                    results[pkg_name] = {
-                        'pname': info.get('pname', pkg_name),
-                        'version': info.get('version', 'unknown'),
-                        'description': info.get('description', ''),
-                        'summary': (info.get('description', '')[:200] 
-                                   if info.get('description') else ''),
-                    }
-                    
-                    if len(results) >= limit:
-                        break
-                        
-            except subprocess.TimeoutExpired:
-                print(f"nix search timed out for term: {term}")
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse nix search output: {e}")
-            except Exception as e:
-                print(f"Error during nix search: {e}")
+        except subprocess.TimeoutExpired:
+            print(f"nix-search timed out")
+        except Exception as e:
+            print(f"Error during nix-search: {e}")
         
         return results
+    
+    def search_by_name(self, name: str, limit: int = 20) -> Dict[str, Dict]:
+        """Search by package attribute name."""
+        results = {}
+        
+        try:
+            cmd = self._nix_search_cmd + [
+                '--name', name,
+                '--channel', self.channel,
+                '--max-results', str(limit),
+                '--json'
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                return {}
+            
+            for line in result.stdout.strip().split('\n'):
+                if not line:
+                    continue
+                try:
+                    pkg = json.loads(line)
+                    attr_name = pkg.get('package_attr_name', '')
+                    if attr_name:
+                        results[attr_name] = self._parse_package(pkg)
+                except json.JSONDecodeError:
+                    continue
+                    
+        except Exception as e:
+            print(f"Error during nix-search: {e}")
+        
+        return results
+    
+    def search_by_program(self, program: str, limit: int = 20) -> Dict[str, Dict]:
+        """Search by installed program name."""
+        results = {}
+        
+        try:
+            cmd = self._nix_search_cmd + [
+                '--program', program,
+                '--channel', self.channel,
+                '--max-results', str(limit),
+                '--json'
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                return {}
+            
+            for line in result.stdout.strip().split('\n'):
+                if not line:
+                    continue
+                try:
+                    pkg = json.loads(line)
+                    attr_name = pkg.get('package_attr_name', '')
+                    if attr_name:
+                        results[attr_name] = self._parse_package(pkg)
+                except json.JSONDecodeError:
+                    continue
+                    
+        except Exception as e:
+            print(f"Error during nix-search: {e}")
+        
+        return results
+    
+    def _parse_package(self, pkg: Dict) -> Dict:
+        """Parse nix-search-cli JSON output into our format."""
+        description = pkg.get('package_description', '')
+        
+        # Format license
+        license_info = pkg.get('package_license', [])
+        if license_info and isinstance(license_info, list):
+            license_str = license_info[0].get('fullName', 'unknown') if license_info else 'unknown'
+        else:
+            license_str = 'unknown'
+        
+        # Format homepage
+        homepage = pkg.get('package_homepage', [])
+        if isinstance(homepage, list):
+            homepage = homepage[0] if homepage else ''
+        
+        return {
+            'pname': pkg.get('package_pname', pkg.get('package_attr_name', '')),
+            'version': pkg.get('package_pversion', 'unknown'),
+            'description': description,
+            'summary': description[:200] if description else '',
+            'homepage': homepage,
+            'license': license_str,
+            'programs': pkg.get('package_programs', []),
+            'outputs': pkg.get('package_outputs', ['out']),
+        }
     
     def get_package_info(self, package_name: str) -> Optional[Dict]:
         """
@@ -109,110 +228,21 @@ class NixSearch:
         if package_name in self._cache:
             return self._cache[package_name]
         
-        try:
-            # Use nix eval to get package metadata
-            result = subprocess.run(
-                ['nix', 'eval', f'{self.flake_ref}#{package_name}.meta', '--json'],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            if result.returncode != 0:
-                # Try without .meta (some packages might not have it)
-                return self._get_basic_info(package_name)
-            
-            meta = json.loads(result.stdout)
-            
-            # Get version separately
-            version_result = subprocess.run(
-                ['nix', 'eval', f'{self.flake_ref}#{package_name}.version', '--raw'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            version = version_result.stdout if version_result.returncode == 0 else 'unknown'
-            
-            info = {
-                'pname': package_name,
-                'version': version,
-                'description': meta.get('description', ''),
-                'summary': (meta.get('description', '')[:200] 
-                           if meta.get('description') else ''),
-                'homepage': meta.get('homepage', ''),
-                'license': self._format_license(meta.get('license')),
-                'maintainers': self._format_maintainers(meta.get('maintainers', [])),
-            }
-            
-            self._cache[package_name] = info
-            return info
-            
-        except subprocess.TimeoutExpired:
-            print(f"nix eval timed out for: {package_name}")
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse nix eval output: {e}")
-        except Exception as e:
-            print(f"Error getting package info: {e}")
+        # Search by exact name
+        results = self.search_by_name(package_name, limit=5)
+        
+        # Look for exact match
+        if package_name in results:
+            self._cache[package_name] = results[package_name]
+            return results[package_name]
+        
+        # Try partial match
+        for name, info in results.items():
+            if info.get('pname') == package_name:
+                self._cache[package_name] = info
+                return info
         
         return None
-    
-    def _get_basic_info(self, package_name: str) -> Optional[Dict]:
-        """Get basic info when full metadata isn't available."""
-        try:
-            # Just get version
-            result = subprocess.run(
-                ['nix', 'eval', f'{self.flake_ref}#{package_name}.version', '--raw'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return {
-                    'pname': package_name,
-                    'version': result.stdout,
-                    'description': '',
-                    'summary': '',
-                }
-        except Exception:
-            pass
-        
-        return None
-    
-    def _format_license(self, license_info) -> str:
-        """Format license information from nix meta."""
-        if not license_info:
-            return 'unknown'
-        
-        if isinstance(license_info, str):
-            return license_info
-        
-        if isinstance(license_info, dict):
-            return license_info.get('spdxId', license_info.get('shortName', 'unknown'))
-        
-        if isinstance(license_info, list):
-            # Multiple licenses
-            names = []
-            for lic in license_info:
-                if isinstance(lic, dict):
-                    names.append(lic.get('spdxId', lic.get('shortName', '')))
-                elif isinstance(lic, str):
-                    names.append(lic)
-            return ' AND '.join(filter(None, names)) or 'unknown'
-        
-        return 'unknown'
-    
-    def _format_maintainers(self, maintainers: List) -> List[str]:
-        """Format maintainer information."""
-        result = []
-        for m in maintainers:
-            if isinstance(m, dict):
-                name = m.get('name', m.get('github', ''))
-                if name:
-                    result.append(name)
-            elif isinstance(m, str):
-                result.append(m)
-        return result
     
     def resolve_package(self, package_name: str) -> Optional[Tuple[str, str]]:
         """
@@ -228,12 +258,12 @@ class NixSearch:
         if info:
             return (package_name, info.get('version', 'unknown'))
         
-        # Try searching for it
+        # Try general search
         results = self.search([package_name], limit=5)
         if package_name in results:
             return (package_name, results[package_name].get('version', 'unknown'))
         
-        # Check if any result is an exact match
+        # Check if any result is an exact pname match
         for name, info in results.items():
             if info.get('pname') == package_name:
                 return (name, info.get('version', 'unknown'))
