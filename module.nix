@@ -21,37 +21,27 @@ in
     # Ensure PackageKit is enabled
     services.packagekit.enable = mkDefault true;
     
-    # The key: we need to get PackageKit to use our backend
-    # This requires:
-    # 1. Backend .so in lib/packagekit-backend/
-    # 2. Python helpers in share/PackageKit/helpers/<backend>/
-    # 3. PackageKit.conf DefaultBackend setting
+    # Configure PackageKit to use nix-profile backend via upstream module's settings option
+    services.packagekit.settings = {
+      Daemon = {
+        DefaultBackend = "nix-profile";
+      };
+    };
     
-    # Method: Overlay the backend directory into PackageKit's search path
-    # PackageKit searches: /usr/lib/packagekit-backend, /var/lib/PackageKit/plugins
-    
-    # Create activation script to link backend
+    # Create activation script to link backend files
+    # PackageKit searches: /var/lib/PackageKit/plugins for backend .so files
+    # and /usr/share/PackageKit/helpers/<backend>/ for spawned backends
     system.activationScripts.packagekit-nix-profile = ''
       # Link backend shared library
       mkdir -p /var/lib/PackageKit/plugins
       ln -sf ${cfg.package}/lib/packagekit-backend/libpk_backend_nix-profile.so \
              /var/lib/PackageKit/plugins/
       
-      # Link helper scripts - PackageKit spawn looks in share/PackageKit/helpers/
+      # Link helper scripts
       mkdir -p /usr/share/PackageKit/helpers
       rm -rf /usr/share/PackageKit/helpers/nix-profile
       ln -sf ${cfg.package}/share/PackageKit/helpers/nix-profile \
              /usr/share/PackageKit/helpers/nix-profile
-    '';
-    
-    # Configure PackageKit to use nix-profile backend
-    environment.etc."PackageKit/PackageKit.conf".text = ''
-      [Daemon]
-      DefaultBackend=nix-profile
-      KeepCache=false
-      
-      [Logging]
-      MaximumLevel=debug
     '';
   };
 }

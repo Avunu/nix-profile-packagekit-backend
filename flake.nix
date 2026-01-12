@@ -40,6 +40,7 @@
         # This creates a wrapped Python with packages in sys.path
         pythonEnv = pkgs.python3.withPackages (ps: [
           ps.brotli
+          ps.pytest
           # PackageKit has Python bindings in lib/python*/site-packages/
           # toPythonModule lets withPackages pick them up
           (ps.toPythonModule pkgs.packagekit)
@@ -49,6 +50,74 @@
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
+        };
+
+        # Checks (run with: nix flake check)
+        checks = {
+          # Unit tests
+          unit-tests = pkgs.runCommand "unit-tests" {
+            nativeBuildInputs = [ pythonEnv ];
+          } ''
+            cd ${./.}
+            python -m pytest tests/ -v
+            touch $out
+          '';
+
+          # Integration test (NixOS VM)
+          # Run with: nix build .#checks.x86_64-linux.integration
+          integration = pkgs.testers.runNixOSTest {
+            name = "packagekit-nix-profile-backend";
+
+            nodes.machine =
+              { config, pkgs, ... }:
+              {
+                imports = [ self.nixosModules.default ];
+
+                # Enable the backend
+                services.packagekit.backends.nix-profile.enable = true;
+
+                # Test user with home directory
+                users.users.testuser = {
+                  isNormalUser = true;
+                  home = "/home/testuser";
+                };
+
+                services.dbus.enable = true;
+                environment.systemPackages = [ pkgs.packagekit ];
+              };
+
+            testScript = ''
+              machine.start()
+              machine.wait_for_unit("multi-user.target")
+
+              # Check backend library is installed
+              machine.succeed("test -f /var/lib/PackageKit/plugins/libpk_backend_nix-profile.so")
+
+              # Check helper scripts are installed  
+              machine.succeed("test -d /usr/share/PackageKit/helpers/nix-profile")
+              machine.succeed("test -f /usr/share/PackageKit/helpers/nix-profile/nix_profile_backend.py")
+
+              # Check PackageKit config
+              machine.succeed("grep -q 'DefaultBackend=nix-profile' /etc/PackageKit/PackageKit.conf")
+
+              # Wait for D-Bus
+              machine.wait_for_unit("dbus.service")
+
+              # Test Python backend directly as testuser
+              # Set PackageKit environment variables to suppress library warnings
+              output = machine.succeed(
+                "su - testuser -c '"
+                "export NETWORK=TRUE UID=1000 BACKGROUND=FALSE INTERACTIVE=TRUE; "
+                "printf \"get-packages\\tinstalled\\n\" | "
+                "/usr/share/PackageKit/helpers/nix-profile/nix_profile_backend.py"
+                "' 2>&1 | head -20"
+              )
+              print(f"Backend output: {output}")
+              
+              # Verify we got the expected output format
+              assert "finished" in output, "Backend should complete with 'finished'"
+            '';
+          };
         };
 
         # Development shell
@@ -65,8 +134,10 @@
           shellHook = ''
             echo "PackageKit Nix Profile Backend Development"
             echo ""
-            echo "Build:   nix build"
-            echo "Test:    ./test_backend.py"
+            echo "Build:    nix build"
+            echo "Test:     pytest tests/"
+            echo "Check:    nix flake check"
+            echo "VM Test:  nix build .#checks.x86_64-linux.integration"
             echo ""
           '';
         };
