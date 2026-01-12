@@ -6,6 +6,7 @@ result-*
 __pycache__/
 *.py[cod]
 *.so
+.pytest_cache/
 
 # Editors
 .idea/
