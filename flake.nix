@@ -10,38 +10,35 @@
       url = "github:PackageKit/PackageKit/v1.3.0";
       flake = false;
     };
-    
+
     # AppStream data for nixpkgs (optional, for GUI software centers)
     # Note: This data may be outdated - consider regenerating with nixos-appstream-generator
     appstream-data.url = "github:snowfallorg/nixos-appstream-data";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      packagekit-src,
-      appstream-data,
-      ...
-    }:
-    let
-      # Overlay that provides the backend package
-      overlay = final: prev: {
-        packagekit-backend-nix-profile = final.callPackage ./package.nix {
-          packagekitSrc = packagekit-src;
-        };
-        
-        # Re-export upstream AppStream data package
-        nixos-appstream-data = appstream-data.packages.${final.system}.default;
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    packagekit-src,
+    appstream-data,
+    ...
+  }: let
+    # Overlay that provides the backend package
+    overlay = final: prev: {
+      packagekit-backend-nix-profile = final.callPackage ./package.nix {
+        packagekitSrc = packagekit-src;
       };
-    in
+
+      # Re-export upstream AppStream data package
+      nixos-appstream-data = appstream-data.packages.${final.system}.default;
+    };
+  in
     flake-utils.lib.eachDefaultSystem (
-      system:
-      let
+      system: let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ overlay ];
+          overlays = [overlay];
         };
 
         # Python environment with all dependencies for development
@@ -53,8 +50,7 @@
           # toPythonModule lets withPackages pick them up
           (ps.toPythonModule pkgs.packagekit)
         ]);
-      in
-      {
+      in {
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
@@ -64,36 +60,39 @@
         # Checks (run with: nix flake check)
         checks = {
           # Unit tests
-          unit-tests = pkgs.runCommand "unit-tests" {
-            nativeBuildInputs = [ pythonEnv ];
-          } ''
-            cd ${./.}
-            python -m pytest tests/ -v
-            touch $out
-          '';
+          unit-tests =
+            pkgs.runCommand "unit-tests" {
+              nativeBuildInputs = [pythonEnv];
+            } ''
+              cd ${./.}
+              python -m pytest tests/ -v
+              touch $out
+            '';
 
           # Integration test (NixOS VM)
           # Run with: nix build .#checks.x86_64-linux.integration
           integration = pkgs.testers.runNixOSTest {
             name = "packagekit-nix-profile-backend";
 
-            nodes.machine =
-              { config, pkgs, ... }:
-              {
-                imports = [ self.nixosModules.default ];
+            nodes.machine = {
+              config,
+              pkgs,
+              ...
+            }: {
+              imports = [self.nixosModules.default];
 
-                # Enable the backend
-                services.packagekit.backends.nix-profile.enable = true;
+              # Enable the backend
+              services.packagekit.backends.nix-profile.enable = true;
 
-                # Test user with home directory
-                users.users.testuser = {
-                  isNormalUser = true;
-                  home = "/home/testuser";
-                };
-
-                services.dbus.enable = true;
-                environment.systemPackages = [ pkgs.packagekit ];
+              # Test user with home directory
+              users.users.testuser = {
+                isNormalUser = true;
+                home = "/home/testuser";
               };
+
+              services.dbus.enable = true;
+              environment.systemPackages = [pkgs.packagekit];
+            };
 
             testScript = ''
               machine.start()
@@ -102,7 +101,7 @@
               # Check backend library is installed
               machine.succeed("test -f /var/lib/PackageKit/plugins/libpk_backend_nix-profile.so")
 
-              # Check helper scripts are installed  
+              # Check helper scripts are installed
               machine.succeed("test -d /usr/share/PackageKit/helpers/nix-profile")
               machine.succeed("test -f /usr/share/PackageKit/helpers/nix-profile/nix_profile_backend.py")
 
@@ -122,7 +121,7 @@
                 "' 2>&1 | head -20"
               )
               print(f"Backend output: {output}")
-              
+
               # Verify we got the expected output format
               assert "finished" in output, "Backend should complete with 'finished'"
             '';
@@ -160,13 +159,19 @@
     )
     // {
       # NixOS module for easy integration (includes overlay automatically)
-      nixosModules.default = { config, lib, pkgs, ... }: {
-        imports = [ (import ./module.nix) ];
+      nixosModules.default = {
+        config,
+        lib,
+        pkgs,
+        ...
+      }: {
+        imports = [(import ./module.nix)];
         # Apply overlay, but only if nixpkgs.overlays is configurable (not read-only like in tests)
         config = lib.mkIf config.services.packagekit.backends.nix-profile.enable {
-          nixpkgs.overlays = lib.mkIf 
-            (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null) 
-            [ overlay ];
+          nixpkgs.overlays =
+            lib.mkIf
+            (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null)
+            [overlay];
         };
       };
       nixosModules.nix-profile-backend = self.nixosModules.default;

@@ -21,7 +21,7 @@
 
 /*
  * PackageKit backend for Nix profile management
- * 
+ *
  * This is a thin C wrapper that spawns the nix_profile_backend.py Python script
  * for all PackageKit operations. The Python backend handles:
  * - Installing packages via `nix profile install`
