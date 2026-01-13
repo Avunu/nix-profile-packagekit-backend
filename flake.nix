@@ -106,10 +106,10 @@
               # Import module directly (can't use nixosModules.default in tests due to read-only pkgs)
               imports = [(import ./module.nix)];
 
-              # Provide packages directly via module options
+              # Enable the backend
               services.packagekit.backends.nix-profile.enable = true;
-              services.packagekit.backends.nix-profile.package = pkgs.packagekit-nix;
-              services.packagekit.backends.nix-profile.appstream.package = lib.mkForce null;
+              # Disable AppStream for simpler test (not needed to verify backend works)
+              services.packagekit.backends.nix-profile.appstream.enable = false;
 
               # Test user with home directory
               users.users.testuser = {
