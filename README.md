@@ -45,6 +45,21 @@ Then rebuild:
 sudo nixos-rebuild switch
 ```
 
+### Avoiding Rebuild Cascades
+
+By default, the module uses systemd bind mounts to inject the backend at runtime,
+avoiding rebuilds of packages that depend on PackageKit (like Dolphin, KWin, Plasma).
+
+If you prefer cleaner integration at the cost of rebuilding those packages:
+
+```nix
+# Use nixosModules.full instead of nixosModules.default
+nix-profile-backend.nixosModules.full
+
+# Or explicitly disable avoidRebuilds:
+services.packagekit.backends.nix-profile.avoidRebuilds = false;
+```
+
 ### Manual Testing
 
 ```bash

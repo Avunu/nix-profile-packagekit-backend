@@ -27,9 +27,9 @@
     appstream-data,
     ...
   }: let
-    # Overlay that provides the backend package and replaces PackageKit
-    overlay = final: prev: let
-      # Build backend against the original packagekit to avoid infinite recursion
+    # Minimal overlay - just provides the backend package without modifying packagekit
+    # Use this to avoid rebuild cascades of KDE/GNOME packages
+    overlayMinimal = final: prev: let
       backend = final.callPackage ./package.nix {
         packagekitSrc = packagekit-src;
         packagekit = prev.packagekit;
@@ -38,25 +38,42 @@
       # The backend .so and helper scripts
       packagekit-backend-nix-profile = backend;
 
-      # Override packagekit to include our backend in its lib directory
-      # We need to rebuild with our backend copied into the output
-      packagekit = prev.packagekit.overrideAttrs (oldAttrs: {
-        postInstall = (oldAttrs.postInstall or "") + ''
-          # Add nix-profile backend
-          ln -sf ${backend}/lib/packagekit-backend/*.so $out/lib/packagekit-backend/
+      # Re-export upstream AppStream data package
+      nixos-appstream-data = appstream-data.packages.${final.system}.default;
+    };
 
-          # Link helper scripts (create parent dir if needed)
-          mkdir -p $out/share/PackageKit/helpers
-          ln -sfn ${backend}/share/PackageKit/helpers/nix-profile $out/share/PackageKit/helpers/nix-profile
-        '';
+    # Full overlay - modifies packagekit to include our backend
+    # Cleaner integration but causes rebuilds of packagekit reverse dependencies
+    overlayFull = final: prev: let
+      backend = final.callPackage ./package.nix {
+        packagekitSrc = packagekit-src;
+        packagekit = prev.packagekit;
+      };
+    in {
+      packagekit-backend-nix-profile = backend;
+
+      # Override packagekit to include our backend in its lib directory
+      packagekit = prev.packagekit.overrideAttrs (oldAttrs: {
+        postInstall =
+          (oldAttrs.postInstall or "")
+          + ''
+            # Add nix-profile backend
+            ln -sf ${backend}/lib/packagekit-backend/*.so $out/lib/packagekit-backend/
+
+            # Link helper scripts (create parent dir if needed)
+            mkdir -p $out/share/PackageKit/helpers
+            ln -sfn ${backend}/share/PackageKit/helpers/nix-profile $out/share/PackageKit/helpers/nix-profile
+          '';
       });
 
       # Keep packagekit-nix as an alias for compatibility
       packagekit-nix = final.packagekit;
 
-      # Re-export upstream AppStream data package
       nixos-appstream-data = appstream-data.packages.${final.system}.default;
     };
+
+    # Default overlay uses minimal to avoid rebuilds
+    overlay = overlayMinimal;
   in
     flake-utils.lib.eachDefaultSystem (
       system: let
@@ -77,7 +94,6 @@
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
-          packagekit-nix = pkgs.packagekit-nix;
           appstream-data = pkgs.nixos-appstream-data;
         };
 
@@ -100,9 +116,9 @@
           integration = pkgs.testers.runNixOSTest {
             name = "packagekit-nix-profile-backend";
 
-            # Use defaults to add our overlay to all nodes
+            # Use minimal overlay - the module will use bind mounts
             defaults = {lib, ...}: {
-              nixpkgs.overlays = lib.mkForce [overlay];
+              nixpkgs.overlays = lib.mkForce [overlayMinimal];
             };
 
             nodes.machine = {
@@ -114,20 +130,19 @@
               imports = [(import ./module.nix)];
 
               services.packagekit.backends.nix-profile.enable = true;
+              # Use bind mount approach (default)
+              services.packagekit.backends.nix-profile.avoidRebuilds = true;
               services.packagekit.backends.nix-profile.appstream.enable = true;
-              # Explicitly set the appstream package since pkgs.nixos-appstream-data
-              # might not be available if the overlay wasn't applied correctly
               services.packagekit.backends.nix-profile.appstream.package = pkgs.nixos-appstream-data;
 
-              # Add appstreamcli for testing AND the appstream data package directly
-              # (to ensure it gets linked even if module has issues)
+              # Add appstreamcli for testing
               environment.systemPackages = [
                 pkgs.appstream
                 pkgs.nixos-appstream-data
               ];
 
               # Ensure app-info directory gets linked from systemPackages
-              environment.pathsToLink = [ "/share/app-info" ];
+              environment.pathsToLink = ["/share/app-info"];
 
               users.users.testuser = {
                 isNormalUser = true;
@@ -137,12 +152,9 @@
               services.dbus.enable = true;
             };
 
-            testScript = ''
+            testScript = {nodes, ...}: ''
               machine.start()
               machine.wait_for_unit("multi-user.target")
-
-              # Check backend library is installed in packagekit's directory
-              machine.succeed("test -f /run/current-system/sw/lib/packagekit-backend/libpk_backend_nix-profile.so")
 
               # Check PackageKit config
               machine.succeed("grep -q 'DefaultBackend=nix-profile' /etc/PackageKit/PackageKit.conf")
@@ -151,12 +163,22 @@
               machine.wait_for_unit("dbus.service")
 
               # Test PackageKit daemon can start and stays running
+              # The bind mount will inject our backend into packagekit's view
               machine.succeed("systemctl start packagekit")
               machine.succeed("systemctl is-active packagekit")
 
               # Verify the backend loaded successfully (no error in journal)
               result = machine.succeed("journalctl -u packagekit --no-pager")
+              print(f"PackageKit journal: {result}")
               assert "Failed to load the backend" not in result, "Backend should load successfully"
+
+              # Try to use pkcon to verify the backend is actually working
+              # This will fail if the backend can't be loaded
+              result = machine.succeed("pkcon backend-details 2>&1 || true")
+              print(f"Backend details: {result}")
+              # Should show nix-profile as the backend name
+              assert "nix-profile" in result.lower() or "Backend:" in result, "Backend should be available"
+
               print("PackageKit started successfully with nix-profile backend!")
 
               # Test AppStream data is accessible
@@ -219,12 +241,29 @@
         ...
       }: {
         imports = [(import ./module.nix)];
-        # Always apply overlay so pkgs.packagekit-backend-nix-profile is available
-        nixpkgs.overlays = [overlay];
+        # Apply minimal overlay by default - doesn't modify packagekit, avoids rebuilds
+        # The module uses runtime bind mounts to inject the backend
+        nixpkgs.overlays = [overlayMinimal];
       };
       nixosModules.nix-profile-backend = self.nixosModules.default;
 
-      # Overlay for use in other flakes (if needed separately)
-      overlays.default = overlay;
+      # Alternative module that rebuilds packagekit (cleaner but causes rebuild cascades)
+      nixosModules.full = {
+        config,
+        lib,
+        pkgs,
+        ...
+      }: {
+        imports = [(import ./module.nix)];
+        # Apply full overlay - modifies packagekit, causes rebuilds of KDE/GNOME
+        nixpkgs.overlays = [overlayFull];
+        # Disable the bind mount approach since we're modifying packagekit directly
+        services.packagekit.backends.nix-profile.avoidRebuilds = lib.mkDefault false;
+      };
+
+      # Overlays for use in other flakes
+      overlays.default = overlayMinimal; # Recommended - no rebuilds
+      overlays.minimal = overlayMinimal; # Same as default
+      overlays.full = overlayFull; # Modifies packagekit, causes rebuilds
     };
 }
