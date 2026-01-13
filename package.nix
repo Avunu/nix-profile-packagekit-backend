@@ -8,53 +8,52 @@
   nix-search-cli,
   packagekitSrc,
 }: let
-  # Python environment with dependencies
-  pythonEnv = python3.withPackages (
-    ps:
-      with ps; [
-        brotli # For decompressing nix-data-db
-        requests # For downloading data at runtime
-      ]
-  );
-
   backendName = "nix-profile";
-in
-  stdenv.mkDerivation {
-    pname = "packagekit-backend-nix-profile";
+
+  # Python backend as a proper Python application
+  pythonBackend = python3.pkgs.buildPythonApplication {
+    pname = "packagekit-nix-profile-backend";
     version = "1.0.0";
+    pyproject = true;
 
     src = lib.cleanSourceWith {
       src = ./.;
       filter = path: type: let
         baseName = baseNameOf path;
       in
-        # Exclude git, build artifacts, data directories
-        baseName
-        != ".git"
-        && baseName != "result"
-        && baseName != "flake.lock"
-        && baseName != "__pycache__"
-        && baseName != ".pytest_cache"
-        && baseName != "nix-data-db"
-        && baseName != "nixos-appstream-data"
-        && true;
+        baseName != ".git" && baseName != "result" && baseName != "__pycache__";
     };
 
-    nativeBuildInputs = [
-      pkg-config
-      python3 # For generating enums.py
+    build-system = [python3.pkgs.setuptools];
+
+    dependencies = with python3.pkgs; [
+      (toPythonModule packagekit)
     ];
 
-    buildInputs = [
-      glib
-      packagekit
+    makeWrapperArgs = [
+      "--prefix"
+      "PATH"
+      ":"
+      "${nix-search-cli}/bin"
     ];
 
-    # Build the C shim that spawns the Python backend
+    meta.mainProgram = "nix_profile_backend";
+  };
+
+  # C shim library
+  cBackend = stdenv.mkDerivation {
+    pname = "packagekit-backend-nix-profile-shim";
+    version = "1.0.0";
+
+    src = lib.cleanSourceWith {
+      src = ./.;
+      filter = path: type: (baseNameOf path) == "pk-backend-nix-profile.c";
+    };
+
+    nativeBuildInputs = [pkg-config];
+    buildInputs = [glib packagekit];
+
     buildPhase = ''
-      runHook preBuild
-
-      # Compile the C backend shim
       ${stdenv.cc}/bin/cc -shared -fPIC \
         $(pkg-config --cflags glib-2.0 packagekit-glib2) \
         -I${packagekitSrc}/src \
@@ -64,55 +63,35 @@ in
         -o libpk_backend_nix-profile.so \
         pk-backend-nix-profile.c \
         $(pkg-config --libs glib-2.0 packagekit-glib2)
-
-      # Generate enums.py from PackageKit source
-      python3 ${packagekitSrc}/lib/python/enum-convertor.py \
-        ${packagekitSrc}/lib/packagekit-glib2/pk-enum.c > enums.py
-
-      runHook postBuild
     '';
 
     installPhase = ''
-          runHook preInstall
-
-          # Install the backend shared library
-          mkdir -p $out/lib/packagekit-backend
-          cp libpk_backend_nix-profile.so $out/lib/packagekit-backend/
-
-          # Install Python backend to helpers directory
-          mkdir -p $out/share/PackageKit/helpers/${backendName}
-
-          # Create wrapper script that sets PYTHONPATH and PATH for runtime dependencies
-          cat > $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py << EOF
-      #!/bin/sh
-      export PYTHONPATH="$out/share/PackageKit/helpers/${backendName}:\$PYTHONPATH"
-      export PATH="${nix-search-cli}/bin:\$PATH"
-      exec ${pythonEnv}/bin/python3 $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py.real "\$@"
-      EOF
-          chmod +x $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py
-
-          # Install actual Python backend and modules
-          cp nix_profile_backend.py $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py.real
-          cp nix_profile.py $out/share/PackageKit/helpers/${backendName}/
-          cp nix_search.py $out/share/PackageKit/helpers/${backendName}/
-
-          # Install PackageKit Python library from upstream source
-          mkdir -p $out/share/PackageKit/helpers/${backendName}/packagekit
-          cp ${packagekitSrc}/lib/python/packagekit/*.py $out/share/PackageKit/helpers/${backendName}/packagekit/
-          cp enums.py $out/share/PackageKit/helpers/${backendName}/packagekit/
-
-          runHook postInstall
+      mkdir -p $out/lib/packagekit-backend
+      cp libpk_backend_nix-profile.so $out/lib/packagekit-backend/
     '';
 
     dontStrip = true;
+  };
+in
+  stdenv.mkDerivation {
+    pname = "packagekit-backend-nix-profile";
+    version = "1.0.0";
+
+    dontUnpack = true;
+
+    installPhase = ''
+      mkdir -p $out/lib/packagekit-backend
+      mkdir -p $out/share/PackageKit/helpers/${backendName}
+
+      # Link C backend
+      ln -s ${cBackend}/lib/packagekit-backend/*.so $out/lib/packagekit-backend/
+
+      # Link Python backend (the wrapped executable)
+      ln -s ${pythonBackend}/bin/nix_profile_backend $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py
+    '';
 
     meta = with lib; {
       description = "PackageKit backend for Nix profile management";
-      longDescription = ''
-        A Python-based PackageKit backend that enables software centers
-        (GNOME Software, KDE Discover) to manage packages in the user's
-        Nix profile via 'nix profile' commands.
-      '';
       license = licenses.gpl2Plus;
       platforms = platforms.linux;
     };

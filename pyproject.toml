@@ -6,6 +6,16 @@ readme = "README.md"
 license = "GPL-2.0-or-later"
 requires-python = ">=3.11"
 
+[project.scripts]
+nix_profile_backend = "nix_profile_backend:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["nix_profile_backend", "nix_profile", "nix_search"]
+
 [tool.ruff]
 line-length = 110
 target-version = "py311"

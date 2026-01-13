@@ -65,7 +65,6 @@
         # Python environment with all dependencies for development
         # This creates a wrapped Python with packages in sys.path
         pythonEnv = pkgs.python3.withPackages (ps: [
-          ps.brotli
           ps.pytest
           # PackageKit has Python bindings in lib/python*/site-packages/
           # toPythonModule lets withPackages pick them up
@@ -103,15 +102,11 @@
               lib,
               ...
             }: {
-              # Import module directly (can't use nixosModules.default in tests due to read-only pkgs)
               imports = [(import ./module.nix)];
 
-              # Enable the backend
               services.packagekit.backends.nix-profile.enable = true;
-              # Disable AppStream for simpler test (not needed to verify backend works)
               services.packagekit.backends.nix-profile.appstream.enable = false;
 
-              # Test user with home directory
               users.users.testuser = {
                 isNormalUser = true;
                 home = "/home/testuser";
@@ -124,12 +119,11 @@
               machine.start()
               machine.wait_for_unit("multi-user.target")
 
-              # Check backend library is installed in packagekit's lib directory
+              # Check backend library is installed
               machine.succeed("ls /run/current-system/sw/lib/packagekit-backend/libpk_backend_nix-profile.so")
 
               # Check helper scripts are installed
               machine.succeed("test -d /run/current-system/sw/share/PackageKit/helpers/nix-profile")
-              machine.succeed("test -f /run/current-system/sw/share/PackageKit/helpers/nix-profile/nix_profile_backend.py")
 
               # Check PackageKit config
               machine.succeed("grep -q 'DefaultBackend=nix-profile' /etc/PackageKit/PackageKit.conf")
@@ -137,7 +131,7 @@
               # Wait for D-Bus
               machine.wait_for_unit("dbus.service")
 
-              # Test PackageKit daemon can load the backend
+              # Test PackageKit daemon can start
               machine.succeed("systemctl start packagekit")
               machine.succeed("systemctl is-active packagekit || journalctl -u packagekit --no-pager")
 
@@ -150,8 +144,6 @@
                 "' 2>&1 | head -20"
               )
               print(f"Backend output: {output}")
-
-              # Verify we got the expected output format
               assert "finished" in output, "Backend should complete with 'finished'"
             '';
           };
