@@ -19,16 +19,13 @@ Add to your `flake.nix`:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nix-profile-backend.url = "github:YOURUSER/nix-profile-packagekit-backend";
+    nix-profile-backend.url = "github:Avunu/nix-profile-packagekit-backend";
   };
 
   outputs = { nixpkgs, nix-profile-backend, ... }: {
     nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
-        # Apply the overlay to get nixos-appstream-data in pkgs
-        { nixpkgs.overlays = [ nix-profile-backend.overlays.default ]; }
-        
         nix-profile-backend.nixosModules.default
         {
           services.packagekit.backends.nix-profile.enable = true;

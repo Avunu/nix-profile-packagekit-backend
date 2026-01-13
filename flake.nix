@@ -155,11 +155,19 @@
       }
     )
     // {
-      # NixOS module for easy integration
-      nixosModules.default = import ./module.nix;
-      nixosModules.nix-profile-backend = import ./module.nix;
+      # NixOS module for easy integration (includes overlay automatically)
+      nixosModules.default = { config, lib, pkgs, ... }: {
+        imports = [ (import ./module.nix) ];
+        # Apply overlay, but only if nixpkgs.overlays is configurable (not read-only like in tests)
+        config = lib.mkIf config.services.packagekit.backends.nix-profile.enable {
+          nixpkgs.overlays = lib.mkIf 
+            (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null) 
+            [ overlay ];
+        };
+      };
+      nixosModules.nix-profile-backend = self.nixosModules.default;
 
-      # Overlay for use in other flakes
+      # Overlay for use in other flakes (if needed separately)
       overlays.default = overlay;
     };
 }
