@@ -1,3 +1,0 @@
-[submodule "PackageKitSrc"]
-	path = PackageKitSrc
-	url = https://github.com/PackageKit/PackageKit.git
