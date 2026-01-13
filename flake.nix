@@ -134,6 +134,8 @@
           packages = [
             pythonEnv
             pkgs.pyright
+            pkgs.ruff
+            pkgs.pre-commit
             pkgs.pkg-config
             pkgs.glib
             pkgs.packagekit
@@ -145,6 +147,8 @@
             echo ""
             echo "Build:    nix build"
             echo "Test:     pytest tests/"
+            echo "Lint:     ruff check . --fix"
+            echo "Format:   ruff format ."
             echo "Check:    nix flake check"
             echo "VM Test:  nix build .#checks.x86_64-linux.integration"
             echo ""

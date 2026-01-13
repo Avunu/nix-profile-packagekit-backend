@@ -1,0 +1,38 @@
+[project]
+name = "packagekit-backend-nix-profile"
+version = "1.0.0"
+description = "PackageKit backend for Nix profile management"
+readme = "README.md"
+license = "GPL-2.0-or-later"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+	"F",   # Pyflakes
+	"E",   # pycodestyle errors
+	"W",   # pycodestyle warnings
+	"I",   # isort
+	"UP",  # pyupgrade
+	"B",   # flake8-bugbear
+	"RUF", # Ruff-specific rules
+]
+ignore = [
+	"B018", # useless expression, not assigned to anything
+	"B904", # raise inside except without from
+	"E101", # indentation contains mixed spaces and tabs
+	"E501", # line too long (handled by formatter)
+	"W191", # indentation contains tabs (we use tabs)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
+docstring-code-format = true
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
