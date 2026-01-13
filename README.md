@@ -26,9 +26,16 @@ Add to your `flake.nix`:
     nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
+        # Apply the overlay to get nixos-appstream-data in pkgs
+        { nixpkgs.overlays = [ nix-profile-backend.overlays.default ]; }
+        
         nix-profile-backend.nixosModules.default
         {
           services.packagekit.backends.nix-profile.enable = true;
+          
+          # Optional: Enable AppStream data for rich app listings
+          # This enables app icons, descriptions, and screenshots in GNOME Software
+          services.packagekit.backends.nix-profile.appstream.enable = true;
         }
       ];
     };
@@ -101,16 +108,35 @@ Package operations map to `nix` commands:
 
 ## Limitations
 
-- **Search speed**: `nix search` evaluates nixpkgs, which takes a few seconds
+- **Search speed**: Uses `nix-search-cli` for fast searches via search.nixos.org
 - **Dependencies**: Nix profile doesn't expose dependency information to PackageKit
 - **System packages**: Only manages user profile, not NixOS system configuration
 - **Categories**: Category browsing is limited (nix doesn't have native categories)
+- **AppStream data**: Pre-generated data may be outdated; consider regenerating periodically
+
+## AppStream Data
+
+For GNOME Software and KDE Discover to show app icons, descriptions, and screenshots,
+you need AppStream metadata. This flake includes pre-generated data from
+[snowfallorg/nixos-appstream-data](https://github.com/snowfallorg/nixos-appstream-data).
+
+**Note**: The bundled AppStream data may be outdated. For fresh data, you can:
+
+1. Use the [nixos-appstream-generator](https://github.com/snowfallorg/nixos-appstream-generator) 
+   to regenerate against current nixpkgs
+2. Point `appstream.dataPath` to your own generated XML files
 
 ## Development
 
 ```bash
 # Enter dev shell
 nix develop
+
+# Run unit tests
+pytest tests/ -v
+
+# Run all checks (unit tests + NixOS VM integration test)
+nix flake check
 
 # Build
 nix build

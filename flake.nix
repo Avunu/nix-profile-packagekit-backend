@@ -10,6 +10,10 @@
       url = "github:PackageKit/PackageKit/v1.3.0";
       flake = false;
     };
+    
+    # AppStream data for nixpkgs (optional, for GUI software centers)
+    # Note: This data may be outdated - consider regenerating with nixos-appstream-generator
+    appstream-data.url = "github:snowfallorg/nixos-appstream-data";
   };
 
   outputs =
@@ -18,6 +22,7 @@
       nixpkgs,
       flake-utils,
       packagekit-src,
+      appstream-data,
       ...
     }:
     let
@@ -26,6 +31,9 @@
         packagekit-backend-nix-profile = final.callPackage ./package.nix {
           packagekitSrc = packagekit-src;
         };
+        
+        # Re-export upstream AppStream data package
+        nixos-appstream-data = appstream-data.packages.${final.system}.default;
       };
     in
     flake-utils.lib.eachDefaultSystem (
@@ -50,6 +58,7 @@
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
+          appstream-data = pkgs.nixos-appstream-data;
         };
 
         # Checks (run with: nix flake check)
