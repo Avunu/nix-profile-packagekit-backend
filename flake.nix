@@ -108,12 +108,26 @@
             nodes.machine = {
               config,
               lib,
+              pkgs,
               ...
             }: {
               imports = [(import ./module.nix)];
 
               services.packagekit.backends.nix-profile.enable = true;
-              services.packagekit.backends.nix-profile.appstream.enable = false;
+              services.packagekit.backends.nix-profile.appstream.enable = true;
+              # Explicitly set the appstream package since pkgs.nixos-appstream-data
+              # might not be available if the overlay wasn't applied correctly
+              services.packagekit.backends.nix-profile.appstream.package = pkgs.nixos-appstream-data;
+
+              # Add appstreamcli for testing AND the appstream data package directly
+              # (to ensure it gets linked even if module has issues)
+              environment.systemPackages = [
+                pkgs.appstream
+                pkgs.nixos-appstream-data
+              ];
+
+              # Ensure app-info directory gets linked from systemPackages
+              environment.pathsToLink = [ "/share/app-info" ];
 
               users.users.testuser = {
                 isNormalUser = true;
@@ -144,6 +158,25 @@
               result = machine.succeed("journalctl -u packagekit --no-pager")
               assert "Failed to load the backend" not in result, "Backend should load successfully"
               print("PackageKit started successfully with nix-profile backend!")
+
+              # Test AppStream data is accessible
+              print("Testing AppStream data...")
+
+              # Check the /usr/share/swcatalog symlinks created by tmpfiles
+              machine.succeed("test -L /usr/share/swcatalog/xml")
+              machine.succeed("test -L /usr/share/swcatalog/icons")
+
+              # Verify AppStream finds the data
+              result = machine.succeed("appstreamcli status 2>&1")
+              print(f"AppStream status: {result}")
+              assert "software components" in result, "AppStream should find components"
+
+              # Search for packages
+              result = machine.succeed("appstreamcli search gnome 2>&1")
+              assert "GNOME" in result, "Should find GNOME applications"
+              print("AppStream search works!")
+
+              print("All tests passed!")
             '';
           };
         };

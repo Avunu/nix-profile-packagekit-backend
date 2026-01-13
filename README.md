@@ -114,14 +114,39 @@ Package operations map to `nix` commands:
 ## AppStream Data
 
 For GNOME Software and KDE Discover to show app icons, descriptions, and screenshots,
-you need AppStream metadata. This flake includes pre-generated data from
+you need AppStream metadata. Enable it with:
+
+```nix
+services.packagekit.backends.nix-profile.appstream.enable = true;
+```
+
+This flake includes pre-generated data from
 [snowfallorg/nixos-appstream-data](https://github.com/snowfallorg/nixos-appstream-data).
+The module automatically creates symlinks in `/usr/share/swcatalog/` for 
+AppStream 1.0+ compatibility.
 
 **Note**: The bundled AppStream data may be outdated. For fresh data, you can:
 
 1. Use the [nixos-appstream-generator](https://github.com/snowfallorg/nixos-appstream-generator) 
    to regenerate against current nixpkgs
-2. Point `appstream.dataPath` to your own generated XML files
+2. Point `appstream.package` to your own package with AppStream XML files
+
+## Configuration Options
+
+```nix
+services.packagekit.backends.nix-profile = {
+  # Enable the nix-profile PackageKit backend
+  enable = true;
+
+  appstream = {
+    # Enable AppStream data for rich app listings in GNOME Software/Discover
+    enable = true;
+
+    # Override the AppStream data package (default: pkgs.nixos-appstream-data from this flake)
+    # package = pkgs.my-custom-appstream-data;
+  };
+};
+```
 
 ## Development
 
