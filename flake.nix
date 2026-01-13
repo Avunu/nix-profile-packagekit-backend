@@ -81,13 +81,16 @@
 
             nodes.machine = {
               config,
-              pkgs,
+              lib,
               ...
             }: {
-              imports = [self.nixosModules.default];
-
-              # Enable the backend
+              # Import module directly (can't use nixosModules.default in tests due to read-only pkgs)
+              imports = [(import ./module.nix)];
+              
+              # Provide packages directly via module options
               services.packagekit.backends.nix-profile.enable = true;
+              services.packagekit.backends.nix-profile.package = pkgs.packagekit-backend-nix-profile;
+              services.packagekit.backends.nix-profile.appstream.package = lib.mkForce null;
 
               # Test user with home directory
               users.users.testuser = {
@@ -171,12 +174,8 @@
         ...
       }: {
         imports = [(import ./module.nix)];
-        # Apply overlay, but only if nixpkgs.overlays is configurable (not read-only like in tests)
-        config = lib.mkIf config.services.packagekit.backends.nix-profile.enable {
-          nixpkgs.overlays = lib.mkIf (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null) [
-            overlay
-          ];
-        };
+        # Always apply overlay so pkgs.packagekit-backend-nix-profile is available
+        nixpkgs.overlays = [overlay];
       };
       nixosModules.nix-profile-backend = self.nixosModules.default;
 
