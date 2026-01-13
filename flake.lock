@@ -3,7 +3,9 @@
     "appstream-data": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": [
+          "nixpkgs"
+        ]
       },
       "locked": {
         "lastModified": 1713192970,
@@ -57,21 +59,6 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1712857205,
-        "narHash": "sha256-5tBT/Zd/sWYDNlVuuGhSJ2ig1vln/NC1Qrot5ynw/WI=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "27abc6249b0c8a6e884a1e8de2ce430b9bc47e2c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
-      "locked": {
         "lastModified": 1768127708,
         "narHash": "sha256-1Sm77VfZh3mU0F5OqKABNLWxOuDeHIlcFjsXeeiPazs=",
         "owner": "NixOS",
@@ -107,7 +94,7 @@
       "inputs": {
         "appstream-data": "appstream-data",
         "flake-utils": "flake-utils_2",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "packagekit-src": "packagekit-src"
       }
     },

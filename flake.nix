@@ -13,7 +13,10 @@
 
     # AppStream data for nixpkgs (optional, for GUI software centers)
     # Note: This data may be outdated - consider regenerating with nixos-appstream-generator
-    appstream-data.url = "github:snowfallorg/nixos-appstream-data";
+    appstream-data = {
+      url = "github:snowfallorg/nixos-appstream-data";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -61,9 +64,11 @@
         checks = {
           # Unit tests
           unit-tests =
-            pkgs.runCommand "unit-tests" {
+            pkgs.runCommand "unit-tests"
+            {
               nativeBuildInputs = [pythonEnv];
-            } ''
+            }
+            ''
               cd ${./.}
               python -m pytest tests/ -v
               touch $out
@@ -168,10 +173,9 @@
         imports = [(import ./module.nix)];
         # Apply overlay, but only if nixpkgs.overlays is configurable (not read-only like in tests)
         config = lib.mkIf config.services.packagekit.backends.nix-profile.enable {
-          nixpkgs.overlays =
-            lib.mkIf
-            (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null)
-            [overlay];
+          nixpkgs.overlays = lib.mkIf (!(config.nixpkgs ? pkgs) && config.nixpkgs.overlays != null) [
+            overlay
+          ];
         };
       };
       nixosModules.nix-profile-backend = self.nixosModules.default;
