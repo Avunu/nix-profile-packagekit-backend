@@ -27,10 +27,28 @@
     appstream-data,
     ...
   }: let
-    # Overlay that provides the backend package
+    # Overlay that provides the backend package and wrapped PackageKit
     overlay = final: prev: {
+      # The backend .so and helper scripts
       packagekit-backend-nix-profile = final.callPackage ./package.nix {
         packagekitSrc = packagekit-src;
+      };
+
+      # Wrapped PackageKit with our backend included in its lib directory
+      packagekit-nix = final.symlinkJoin {
+        name = "packagekit-nix-${prev.packagekit.version}";
+        paths = [prev.packagekit];
+        postBuild = ''
+          # Add our backend to the packagekit-backend directory
+          mkdir -p $out/lib/packagekit-backend
+          ln -sf ${final.packagekit-backend-nix-profile}/lib/packagekit-backend/*.so \
+                 $out/lib/packagekit-backend/
+
+          # Link helper scripts
+          mkdir -p $out/share/PackageKit/helpers
+          ln -sf ${final.packagekit-backend-nix-profile}/share/PackageKit/helpers/nix-profile \
+                 $out/share/PackageKit/helpers/
+        '';
       };
 
       # Re-export upstream AppStream data package
@@ -57,6 +75,7 @@
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
+          packagekit-nix = pkgs.packagekit-nix;
           appstream-data = pkgs.nixos-appstream-data;
         };
 
@@ -86,10 +105,10 @@
             }: {
               # Import module directly (can't use nixosModules.default in tests due to read-only pkgs)
               imports = [(import ./module.nix)];
-              
+
               # Provide packages directly via module options
               services.packagekit.backends.nix-profile.enable = true;
-              services.packagekit.backends.nix-profile.package = pkgs.packagekit-backend-nix-profile;
+              services.packagekit.backends.nix-profile.package = pkgs.packagekit-nix;
               services.packagekit.backends.nix-profile.appstream.package = lib.mkForce null;
 
               # Test user with home directory
@@ -99,19 +118,18 @@
               };
 
               services.dbus.enable = true;
-              environment.systemPackages = [pkgs.packagekit];
             };
 
             testScript = ''
               machine.start()
               machine.wait_for_unit("multi-user.target")
 
-              # Check backend library is installed
-              machine.succeed("test -f /var/lib/PackageKit/plugins/libpk_backend_nix-profile.so")
+              # Check backend library is installed in packagekit's lib directory
+              machine.succeed("ls /run/current-system/sw/lib/packagekit-backend/libpk_backend_nix-profile.so")
 
               # Check helper scripts are installed
-              machine.succeed("test -d /usr/share/PackageKit/helpers/nix-profile")
-              machine.succeed("test -f /usr/share/PackageKit/helpers/nix-profile/nix_profile_backend.py")
+              machine.succeed("test -d /run/current-system/sw/share/PackageKit/helpers/nix-profile")
+              machine.succeed("test -f /run/current-system/sw/share/PackageKit/helpers/nix-profile/nix_profile_backend.py")
 
               # Check PackageKit config
               machine.succeed("grep -q 'DefaultBackend=nix-profile' /etc/PackageKit/PackageKit.conf")
@@ -119,13 +137,16 @@
               # Wait for D-Bus
               machine.wait_for_unit("dbus.service")
 
+              # Test PackageKit daemon can load the backend
+              machine.succeed("systemctl start packagekit")
+              machine.succeed("systemctl is-active packagekit || journalctl -u packagekit --no-pager")
+
               # Test Python backend directly as testuser
-              # Set PackageKit environment variables to suppress library warnings
               output = machine.succeed(
                 "su - testuser -c '"
-                "export NETWORK=TRUE UID=1000 BACKGROUND=FALSE INTERACTIVE=TRUE; "
+                "export NETWORK=TRUE BACKGROUND=FALSE INTERACTIVE=TRUE; "
                 "printf \"get-packages\\tinstalled\\n\" | "
-                "/usr/share/PackageKit/helpers/nix-profile/nix_profile_backend.py"
+                "/run/current-system/sw/share/PackageKit/helpers/nix-profile/nix_profile_backend.py"
                 "' 2>&1 | head -20"
               )
               print(f"Backend output: {output}")

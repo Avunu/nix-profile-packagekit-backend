@@ -12,9 +12,9 @@ in {
 
     package = mkOption {
       type = types.package;
-      default = pkgs.packagekit-backend-nix-profile;
-      defaultText = literalExpression "pkgs.packagekit-backend-nix-profile";
-      description = "The packagekit-nix-profile backend package";
+      default = pkgs.packagekit-nix;
+      defaultText = literalExpression "pkgs.packagekit-nix";
+      description = "The wrapped PackageKit package with nix-profile backend included";
     };
 
     appstream = {
@@ -47,31 +47,20 @@ in {
     # Ensure PackageKit is enabled
     services.packagekit.enable = mkDefault true;
 
-    # Configure PackageKit to use nix-profile backend via upstream module's settings option
+    # Configure PackageKit to use nix-profile backend
     services.packagekit.settings = {
       Daemon = {
         DefaultBackend = "nix-profile";
       };
     };
 
-    # Create activation script to link backend files
-    # PackageKit searches: /var/lib/PackageKit/plugins for backend .so files
-    # and /usr/share/PackageKit/helpers/<backend>/ for spawned backends
-    system.activationScripts.packagekit-nix-profile = ''
-      # Link backend shared library
-      mkdir -p /var/lib/PackageKit/plugins
-      ln -sf ${cfg.package}/lib/packagekit-backend/libpk_backend_nix-profile.so \
-             /var/lib/PackageKit/plugins/
-
-      # Link helper scripts
-      mkdir -p /usr/share/PackageKit/helpers
-      rm -rf /usr/share/PackageKit/helpers/nix-profile
-      ln -sf ${cfg.package}/share/PackageKit/helpers/nix-profile \
-             /usr/share/PackageKit/helpers/nix-profile
-    '';
+    # Override the PackageKit packages to use our wrapped version with the backend included
+    # This replaces the default pkgs.packagekit with pkgs.packagekit-nix
+    services.dbus.packages = mkForce [cfg.package];
+    environment.systemPackages = mkForce [cfg.package];
+    systemd.packages = mkForce [cfg.package];
 
     # Install AppStream metadata for GNOME Software / KDE Discover
-    # Standard paths: /usr/share/swcatalog/xml/ or /usr/share/app-info/xmls/
     system.activationScripts.packagekit-appstream = mkIf cfg.appstream.enable ''
       # Create both standard AppStream directories
       mkdir -p /usr/share/swcatalog/xml
