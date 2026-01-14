@@ -33,9 +33,14 @@ class NixProfile:
 		"""
 		if profile_path is None:
 			home = os.environ.get("HOME")
-			if not home:
-				raise ValueError("HOME environment variable not set")
-			profile_path = os.path.join(home, ".nix-profile")
+			if home:
+				profile_path = os.path.join(home, ".nix-profile")
+			else:
+				# Running as system daemon without HOME set
+				# For read-only operations (get-packages, search), use system profile
+				# Write operations will fail with appropriate error
+				username = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+				profile_path = f"/nix/var/nix/profiles/per-user/{username}/profile"
 
 		self.profile_path = Path(profile_path)
 		self.manifest_path = self.profile_path / "manifest.json"
