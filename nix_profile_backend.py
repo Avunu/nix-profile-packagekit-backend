@@ -544,6 +544,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		"""Search for packages containing files."""
 		self.error(ERROR_NOT_SUPPORTED, "File search not supported for nix profile")
 
+	def search_files(self, filters, values):
+		"""Search for packages containing files (plural)."""
+		self.search_file(filters, values)
+
 	def search_group(self, filters, values):
 		"""Search for packages by group."""
 		self.status(STATUS_QUERY)
@@ -592,7 +596,11 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			percent = int((i + 1) / total * 100) if total > 0 else 100
 			self.percentage(percent)
 
-	def search_name(self, filters, values):
+	def search_groups(self, filters, values):
+		"""Search for packages by group (plural)."""
+		self.search_group(filters, values)
+
+	def search_names(self, filters, values):
 		"""Search package names."""
 		self.status(STATUS_QUERY)
 		self.percentage(0)
