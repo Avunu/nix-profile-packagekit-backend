@@ -238,7 +238,7 @@ pk_backend_search_details (PkBackend *backend, PkBackendJob *job, PkBitfield fil
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-details", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-detail", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -251,7 +251,7 @@ pk_backend_search_files (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-files", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-file", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -264,7 +264,7 @@ pk_backend_search_groups (PkBackend *backend, PkBackendJob *job, PkBitfield filt
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-groups", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-group", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
@@ -277,7 +277,7 @@ pk_backend_search_names (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 
 	filters_text = pk_filter_bitfield_to_string (filters);
 	search = g_strjoinv ("&", values);
-	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-names", filters_text, search, NULL);
+	pk_backend_spawn_helper (spawn, job, "nix_profile_backend.py", "search-name", filters_text, search, NULL);
 	g_free (filters_text);
 	g_free (search);
 }
