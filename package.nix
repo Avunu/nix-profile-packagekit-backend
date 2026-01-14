@@ -5,6 +5,7 @@
   pkg-config,
   glib,
   packagekit,
+  nix,
   nix-search-cli,
   packagekitSrc,
 }: let
@@ -34,7 +35,7 @@
       "--prefix"
       "PATH"
       ":"
-      "${nix-search-cli}/bin"
+      "${lib.makeBinPath [nix nix-search-cli]}"
     ];
 
     meta.mainProgram = "nix_profile_backend";
