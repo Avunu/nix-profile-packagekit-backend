@@ -535,7 +535,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			else:
 				info_type = INFO_AVAILABLE
 
-			self._emit_package(pkg_name, version, info_type)
+			# Use metadata from search results directly instead of re-fetching
+			package_id = self._pkg_to_package_id(pkg_name, version)
+			summary = metadata.get("summary", metadata.get("description", ""))
+			if len(summary) > 100:
+				summary = summary[:97] + "..."
+			self.package(package_id, info_type, summary)
 
 			percent = int((i + 1) / total * 100) if total > 0 else 100
 			self.percentage(percent)
@@ -587,7 +592,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			else:
 				info_type = INFO_AVAILABLE
 
-			self._emit_package(pkg_name, version, info_type)
+			# Use metadata from search results directly instead of re-fetching
+			package_id = self._pkg_to_package_id(pkg_name, version)
+			summary = metadata.get("summary", metadata.get("description", ""))
+			if len(summary) > 100:
+				summary = summary[:97] + "..."
+			self.package(package_id, info_type, summary)
 
 			percent = int((i + 1) / total * 100) if total > 0 else 100
 			self.percentage(percent)
@@ -613,7 +623,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			else:
 				info_type = INFO_AVAILABLE
 
-			self._emit_package(pkg_name, version, info_type)
+			# Use metadata from search results directly instead of re-fetching
+			package_id = self._pkg_to_package_id(pkg_name, version)
+			summary = metadata.get("summary", metadata.get("description", ""))
+			if len(summary) > 100:
+				summary = summary[:97] + "..."
+			self.package(package_id, info_type, summary)
 
 			percent = int((i + 1) / total * 100) if total > 0 else 100
 			self.percentage(percent)
