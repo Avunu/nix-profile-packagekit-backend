@@ -11,11 +11,139 @@ This module handles:
 - Parsing ~/.nix-profile/manifest.json
 - Extracting installed package information
 - Mapping store paths to package names
+
+Manifest Format Documentation:
+-----------------------------
+The nix profile manifest.json has evolved through multiple versions:
+
+Version 2 (legacy):
+  - elements: list of package objects
+  - Each element has: attrPath, originalUrl, storePaths, url
+
+Version 3 (current, Nix 2.4+):
+  - elements: dict keyed by package name
+  - Each element has: active, attrPath, originalUrl, outputs, priority, storePaths, url
+  - attrPath format: "legacyPackages.<system>.<package>" (e.g., "legacyPackages.x86_64-linux.firefox")
 """
+
+from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
+from typing import Literal, TypedDict, cast
+
+# =============================================================================
+# Type definitions for manifest.json structure
+# =============================================================================
+
+
+class ManifestElementV2(TypedDict, total=False):
+	"""
+	Package element in manifest v2 format.
+
+	Example:
+	    {
+	        "attrPath": "firefox",
+	        "originalUrl": "flake:nixpkgs",
+	        "storePaths": ["/nix/store/abc123-firefox-122.0"],
+	        "url": "github:NixOS/nixpkgs/..."
+	    }
+	"""
+
+	attrPath: str
+	originalUrl: str
+	storePaths: list[str]
+	url: str
+
+
+class ManifestElementV3(TypedDict, total=False):
+	"""
+	Package element in manifest v3 format.
+
+	Example:
+	    {
+	        "active": true,
+	        "attrPath": "legacyPackages.x86_64-linux.firefox",
+	        "originalUrl": "flake:nixpkgs",
+	        "outputs": null,
+	        "priority": 5,
+	        "storePaths": ["/nix/store/abc123-firefox-122.0"],
+	        "url": "path:/nix/store/..."
+	    }
+	"""
+
+	active: bool
+	attrPath: str
+	originalUrl: str
+	outputs: list[str] | None
+	priority: int
+	storePaths: list[str]
+	url: str
+
+
+class ManifestV2(TypedDict, total=False):
+	"""
+	Manifest format version 2.
+
+	Example:
+	    {
+	        "version": 2,
+	        "elements": [
+	            {"attrPath": "firefox", ...},
+	            {"attrPath": "vim", ...}
+	        ]
+	    }
+	"""
+
+	version: Literal[1, 2]
+	elements: list[ManifestElementV2]
+
+
+class ManifestV3(TypedDict, total=False):
+	"""
+	Manifest format version 3 (Nix 2.4+).
+
+	Example:
+	    {
+	        "version": 3,
+	        "elements": {
+	            "firefox": {"active": true, "attrPath": "legacyPackages.x86_64-linux.firefox", ...},
+	            "vim": {"active": true, "attrPath": "legacyPackages.x86_64-linux.vim", ...}
+	        }
+	    }
+	"""
+
+	version: Literal[3]
+	elements: dict[str, ManifestElementV3]
+
+
+# Union type for any manifest version
+Manifest = ManifestV2 | ManifestV3
+
+# Normalized elements dict (always v3 format)
+NormalizedElements = dict[str, ManifestElementV3]
+
+
+class PackageInfo(TypedDict):
+	"""Normalized package information returned by get_package_info()."""
+
+	attrPath: str
+	originalUrl: str
+	storePaths: list[str]
+	url: str
+
+
+class LoadedManifest(TypedDict):
+	"""Result of loading and normalizing a manifest."""
+
+	version: int
+	elements: NormalizedElements
+
+
+# =============================================================================
+# NixProfile class
+# =============================================================================
 
 
 class NixProfile:
@@ -45,6 +173,75 @@ class NixProfile:
 		self.profile_path = Path(profile_path)
 		self.manifest_path = self.profile_path / "manifest.json"
 
+	def _load_manifest(self) -> LoadedManifest | None:
+		"""
+		Load and normalize the manifest to v3 format.
+
+		This method handles both v2 (list-based) and v3 (dict-based) manifest
+		formats, normalizing v2 to v3 format for consistent downstream processing.
+
+		Returns:
+		    LoadedManifest with normalized elements dict, or None if manifest
+		    doesn't exist or can't be parsed.
+		"""
+		if not self.manifest_path.exists():
+			return None
+
+		try:
+			with open(self.manifest_path) as f:
+				manifest = cast(Manifest, json.load(f))
+		except (OSError, json.JSONDecodeError):
+			return None
+
+		version_num = manifest.get("version", 1)
+		elements = manifest.get("elements", {})
+
+		if version_num >= 3 and isinstance(elements, dict):
+			# Already v3 format
+			return {"version": version_num, "elements": elements}
+
+		# Convert v2 (list) to v3 (dict) format
+		if not isinstance(elements, list):
+			return {"version": version_num, "elements": {}}
+
+		normalized: NormalizedElements = {}
+		for i, element in enumerate(elements):
+			# Determine the package key
+			attr_path = element.get("attrPath", "")
+			if attr_path:
+				pkg_key = attr_path
+			else:
+				original_url = element.get("originalUrl", "")
+				if original_url and "#" in original_url:
+					pkg_key = original_url.split("#")[-1]
+				else:
+					pkg_key = f"element-{i}"
+
+			# Convert to v3 element format
+			normalized[pkg_key] = {
+				"active": True,
+				"attrPath": attr_path,
+				"originalUrl": element.get("originalUrl", ""),
+				"outputs": None,
+				"priority": 5,
+				"storePaths": element.get("storePaths", []),
+				"url": element.get("url", ""),
+			}
+
+		return {"version": version_num, "elements": normalized}
+
+	def _get_package_name(self, pkg_key: str, element: ManifestElementV3) -> str:
+		"""
+		Extract the simple package name from an element.
+
+		For v3, attrPath is like "legacyPackages.x86_64-linux.firefox" -> "firefox"
+		For v2 (converted), attrPath is the simple name like "firefox"
+		"""
+		attr_path = element.get("attrPath", "")
+		if attr_path and "." in attr_path:
+			return attr_path.split(".")[-1]
+		return attr_path or pkg_key
+
 	def get_installed_packages(self) -> dict[str, str]:
 		"""
 		Get all installed packages with their versions.
@@ -53,78 +250,49 @@ class NixProfile:
 		    Dictionary mapping package attribute names to versions.
 		    Example: {'firefox': '122.0', 'vim': '9.0.1'}
 		"""
-		if not self.manifest_path.exists():
-			return {}
-
-		try:
-			with open(self.manifest_path) as f:
-				manifest = json.load(f)
-		except (OSError, json.JSONDecodeError) as e:
-			print(f"Warning: Failed to parse manifest.json: {e}")
+		loaded = self._load_manifest()
+		if not loaded:
 			return {}
 
 		packages = {}
-		elements = manifest.get("elements", [])
+		for pkg_key, element in loaded["elements"].items():
+			if not element.get("active", True):
+				continue
 
-		for element in elements:
-			# Extract package name from attrPath
-			attr_path = element.get("attrPath")
-			if not attr_path:
-				# Try to extract from originalUrl or storePaths
-				original_url = element.get("originalUrl", "")
-				if original_url:
-					attr_path = self._extract_name_from_url(original_url)
-				else:
-					continue
-
-			# Extract version from store paths
+			pkg_name = self._get_package_name(pkg_key, element)
 			store_paths = element.get("storePaths", [])
 			version = "unknown"
 
 			if store_paths:
-				# Store paths look like: /nix/store/hash-name-version
-				# Parse the first store path
-				store_path = store_paths[0]
-				version = self._extract_version_from_store_path(store_path, attr_path)
+				version = self._extract_version_from_store_path(store_paths[0], pkg_name)
 
-			packages[attr_path] = version
+			packages[pkg_name] = version
 
 		return packages
 
-	def find_package_index(self, package_name: str) -> int | None:
+	def find_package_index(self, package_name: str) -> str | None:
 		"""
-		Find the profile element index for a package.
+		Find the profile element identifier for a package.
 
 		Args:
 		    package_name: Package attribute name
 
 		Returns:
-		    Element index (for use with nix profile remove/upgrade) or None
+		    Package key name (str) for use with nix profile remove/upgrade,
+		    or None if not found.
 		"""
-		if not self.manifest_path.exists():
+		loaded = self._load_manifest()
+		if not loaded:
 			return None
 
-		try:
-			with open(self.manifest_path) as f:
-				manifest = json.load(f)
-		except (OSError, json.JSONDecodeError):
-			return None
-
-		elements = manifest.get("elements", [])
-
-		for i, element in enumerate(elements):
-			attr_path = element.get("attrPath")
-			if attr_path == package_name:
-				return i
-
-			# Also check originalUrl
-			original_url = element.get("originalUrl", "")
-			if package_name in original_url:
-				return i
+		for pkg_key, element in loaded["elements"].items():
+			pkg_name = self._get_package_name(pkg_key, element)
+			if pkg_name == package_name or pkg_key == package_name:
+				return pkg_key
 
 		return None
 
-	def get_package_info(self, package_name: str) -> dict | None:
+	def get_package_info(self, package_name: str) -> PackageInfo | None:
 		"""
 		Get detailed information about an installed package.
 
@@ -132,24 +300,17 @@ class NixProfile:
 		    package_name: Package attribute name
 
 		Returns:
-		    Dictionary with package information or None
+		    PackageInfo dict or None if not found
 		"""
-		if not self.manifest_path.exists():
+		loaded = self._load_manifest()
+		if not loaded:
 			return None
 
-		try:
-			with open(self.manifest_path) as f:
-				manifest = json.load(f)
-		except (OSError, json.JSONDecodeError):
-			return None
-
-		elements = manifest.get("elements", [])
-
-		for element in elements:
-			attr_path = element.get("attrPath")
-			if attr_path == package_name:
+		for pkg_key, element in loaded["elements"].items():
+			pkg_name = self._get_package_name(pkg_key, element)
+			if pkg_name == package_name or pkg_key == package_name:
 				return {
-					"attrPath": attr_path,
+					"attrPath": element.get("attrPath", ""),
 					"originalUrl": element.get("originalUrl", ""),
 					"storePaths": element.get("storePaths", []),
 					"url": element.get("url", ""),
@@ -311,13 +472,7 @@ class NixProfile:
 
 	def is_empty(self) -> bool:
 		"""Check if the profile is empty or doesn't exist."""
-		if not self.manifest_path.exists():
+		loaded = self._load_manifest()
+		if not loaded:
 			return True
-
-		try:
-			with open(self.manifest_path) as f:
-				manifest = json.load(f)
-			elements = manifest.get("elements", [])
-			return len(elements) == 0
-		except (OSError, json.JSONDecodeError):
-			return True
+		return len(loaded["elements"]) == 0
