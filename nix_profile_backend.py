@@ -165,8 +165,11 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 	def __init__(self, args):
 		PackageKitBaseBackend.__init__(self, args)
 
-		# Initialize nix profile manager
+		# Initialize nix profile manager (resolves user from PackageKit UID)
 		self.profile = NixProfile()
+
+		# Store the profile path for nix commands
+		self._profile_path = str(self.profile.profile_path)
 
 		# Initialize nix search for package lookups
 		self.nix_search = NixSearch()
@@ -177,18 +180,29 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		# Lock for thread-safe operations
 		self._lock = threading.Lock()
 
-	def _run_nix_command(self, args: list[str], parse_json: bool = True) -> tuple[int, str, str]:
+	def _run_nix_command(
+		self, args: list[str], parse_json: bool = True, use_profile: bool = True
+	) -> tuple[int, str, str]:
 		"""
 		Run a nix command and optionally parse JSON output.
 
 		Args:
 		    args: Command arguments (without 'nix')
 		    parse_json: Whether to use --log-format internal-json
+		    use_profile: Whether to inject --profile flag for profile commands
 
 		Returns:
 		    Tuple of (returncode, stdout, stderr)
 		"""
 		cmd = ["nix", *args]
+
+		# Inject --profile flag for profile operations to target the user's profile
+		# This ensures we modify the requesting user's profile, not root's
+		if use_profile and len(args) >= 1 and args[0] == "profile":
+			# Insert --profile right after "profile" subcommand
+			profile_flag_idx = 1
+			cmd.insert(profile_flag_idx + 1, "--profile")
+			cmd.insert(profile_flag_idx + 2, self._profile_path)
 
 		if parse_json and "--log-format" not in " ".join(args):
 			cmd.extend(["--log-format", "internal-json"])

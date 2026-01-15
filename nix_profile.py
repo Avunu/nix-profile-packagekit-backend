@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 from pathlib import Path
 from typing import Literal, TypedDict, cast
 
@@ -160,18 +161,50 @@ class NixProfile:
 		    profile_path: Path to profile directory. Defaults to ~/.nix-profile
 		"""
 		if profile_path is None:
-			home = os.environ.get("HOME")
-			if home:
-				profile_path = os.path.join(home, ".nix-profile")
-			else:
-				# Running as system daemon without HOME set
-				# For read-only operations (get-packages, search), use system profile
-				# Write operations will fail with appropriate error
-				username = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
-				profile_path = f"/nix/var/nix/profiles/per-user/{username}/profile"
+			profile_path = self._resolve_user_profile()
 
 		self.profile_path = Path(profile_path)
 		self.manifest_path = self.profile_path / "manifest.json"
+
+	@staticmethod
+	def _resolve_user_profile() -> str:
+		"""
+		Resolve the profile path for the requesting user.
+
+		PackageKit runs as root but provides the UID of the requesting user
+		via the UID environment variable. We use this to find the correct
+		user's profile instead of root's profile.
+
+		Returns:
+		    Path to the user's nix profile
+		"""
+		# PackageKit provides the requesting user's UID
+		uid_str = os.environ.get("UID")
+		if uid_str:
+			try:
+				uid = int(uid_str)
+				pw_entry = pwd.getpwuid(uid)
+				username = pw_entry.pw_name
+				home_dir = pw_entry.pw_dir
+
+				# Try the user's home profile first
+				home_profile = os.path.join(home_dir, ".nix-profile")
+				if os.path.exists(home_profile):
+					return home_profile
+
+				# Fall back to per-user profile location
+				return f"/nix/var/nix/profiles/per-user/{username}/profile"
+			except (ValueError, KeyError):
+				pass  # Invalid UID, fall through to other methods
+
+		# Fallback: try HOME environment variable
+		home = os.environ.get("HOME")
+		if home and home != "/root":
+			return os.path.join(home, ".nix-profile")
+
+		# Last resort: try SUDO_USER or USER
+		username = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+		return f"/nix/var/nix/profiles/per-user/{username}/profile"
 
 	def _load_manifest(self) -> LoadedManifest | None:
 		"""
