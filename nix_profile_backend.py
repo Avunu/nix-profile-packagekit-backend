@@ -198,11 +198,13 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		# Inject --profile flag for profile operations to target the user's profile
 		# This ensures we modify the requesting user's profile, not root's
-		if use_profile and len(args) >= 1 and args[0] == "profile":
-			# Insert --profile right after "profile" subcommand
-			profile_flag_idx = 1
-			cmd.insert(profile_flag_idx + 1, "--profile")
-			cmd.insert(profile_flag_idx + 2, self._profile_path)
+		# Command structure: nix profile <action> [--profile <path>] <args>
+		# e.g., nix profile install --profile /path/to/profile nixpkgs#pkg
+		if use_profile and len(args) >= 2 and args[0] == "profile":
+			# Insert --profile after the action (install/remove/upgrade)
+			# cmd is ["nix", "profile", "action", ...], so insert at index 3
+			cmd.insert(3, "--profile")
+			cmd.insert(4, self._profile_path)
 
 		if parse_json and "--log-format" not in " ".join(args):
 			cmd.extend(["--log-format", "internal-json"])
