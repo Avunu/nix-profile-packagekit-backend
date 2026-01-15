@@ -519,7 +519,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 					version = metadata.get("version", "unknown")
 					self._emit_package(package_name, version, INFO_AVAILABLE)
 
-	def search_detail(self, filters, values):
+	def search_details(self, filters, values):
 		"""Search package descriptions."""
 		self.status(STATUS_QUERY)
 		self.percentage(0)
