@@ -112,5 +112,13 @@ in {
         "L+ /usr/share/app-info - - - - ${appstreamPkg}/share/app-info"
       ];
     })
+
+    # Ensure ~/.nix-profile/share is in XDG_DATA_DIRS for desktop file discovery
+    # This allows GNOME/KDE to find .desktop files installed via nix profile
+    {
+      environment.sessionVariables.XDG_DATA_DIRS = [
+        "$HOME/.nix-profile/share"
+      ];
+    }
   ]);
 }

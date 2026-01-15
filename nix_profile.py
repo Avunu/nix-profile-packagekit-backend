@@ -231,6 +231,84 @@ class NixProfile:
 		except Exception:
 			return "unknown"
 
+	def get_package_files(self, package_name: str) -> list[str]:
+		"""
+		Get files installed by a package.
+
+		Lists files from the package's store paths, focusing on
+		desktop files and binaries that are useful for launching.
+
+		Args:
+		    package_name: Package attribute name
+
+		Returns:
+		    List of file paths
+		"""
+		info = self.get_package_info(package_name)
+		if not info:
+			return []
+
+		files = []
+		store_paths = info.get("storePaths", [])
+
+		for store_path in store_paths:
+			store_dir = Path(store_path)
+			if not store_dir.exists():
+				continue
+
+			# List desktop files (important for GNOME Software launch button)
+			apps_dir = store_dir / "share" / "applications"
+			if apps_dir.exists():
+				for desktop_file in apps_dir.glob("*.desktop"):
+					files.append(str(desktop_file))
+
+			# List binaries
+			bin_dir = store_dir / "bin"
+			if bin_dir.exists():
+				for binary in bin_dir.iterdir():
+					if binary.is_file():
+						files.append(str(binary))
+
+			# List icons (useful for app display)
+			icons_dir = store_dir / "share" / "icons"
+			if icons_dir.exists():
+				for icon in icons_dir.rglob("*"):
+					if icon.is_file():
+						files.append(str(icon))
+
+		return files
+
+	def get_desktop_file(self, package_name: str) -> str | None:
+		"""
+		Get the primary desktop file for a package.
+
+		Args:
+		    package_name: Package attribute name
+
+		Returns:
+		    Path to desktop file or None
+		"""
+		info = self.get_package_info(package_name)
+		if not info:
+			return None
+
+		store_paths = info.get("storePaths", [])
+
+		for store_path in store_paths:
+			apps_dir = Path(store_path) / "share" / "applications"
+			if apps_dir.exists():
+				# Look for a desktop file matching the package name first
+				for desktop_file in apps_dir.glob("*.desktop"):
+					# Prefer files that match the package name
+					if package_name.lower() in desktop_file.name.lower():
+						return str(desktop_file)
+
+				# Fall back to first desktop file found
+				for desktop_file in apps_dir.glob("*.desktop"):
+					return str(desktop_file)
+
+		return None
+
 	def is_empty(self) -> bool:
 		"""Check if the profile is empty or doesn't exist."""
 		if not self.manifest_path.exists():

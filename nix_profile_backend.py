@@ -358,9 +358,14 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 	def get_files(self, package_ids):
 		"""
 		Get files contained in packages.
-		Note: Nix profile doesn't easily expose file lists.
+		Lists files from the package's store paths.
 		"""
-		self.error(ERROR_NOT_SUPPORTED, "File lists not available for nix profile")
+		self.status(STATUS_INFO)
+
+		for package_id in package_ids:
+			pkg_name, _version, _arch, _data = self._parse_package_id(package_id)
+			files = self.profile.get_package_files(pkg_name)
+			self.files(package_id, files)
 
 	def get_update_detail(self, package_ids):
 		"""Get details about available updates."""
@@ -546,8 +551,30 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			self.percentage(percent)
 
 	def search_file(self, filters, values):
-		"""Search for packages containing files."""
-		self.error(ERROR_NOT_SUPPORTED, "File search not supported for nix profile")
+		"""
+		Search for packages containing files.
+		Searches installed packages for matching file names.
+		"""
+		self.status(STATUS_QUERY)
+		self.percentage(0)
+		self.allow_cancel(True)
+
+		search_terms = [v.lower() for v in values]
+		installed = self.profile.get_installed_packages()
+
+		total = len(installed)
+		for i, (pkg_name, version) in enumerate(installed.items()):
+			files = self.profile.get_package_files(pkg_name)
+
+			# Check if any file matches search terms
+			for filepath in files:
+				filename = filepath.lower()
+				if any(term in filename for term in search_terms):
+					self._emit_package(pkg_name, version, INFO_INSTALLED)
+					break  # Only emit package once
+
+			percent = int((i + 1) / total * 100) if total > 0 else 100
+			self.percentage(percent)
 
 	def search_group(self, filters, values):
 		"""Search for packages by group."""
