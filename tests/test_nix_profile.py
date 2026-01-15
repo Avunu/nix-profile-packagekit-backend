@@ -2,12 +2,9 @@
 """Unit tests for nix_profile module."""
 
 import json
-import pwd
 import tempfile
 from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from nix_profile import NixProfile
 
