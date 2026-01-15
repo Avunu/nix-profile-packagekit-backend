@@ -42,6 +42,7 @@ pk_backend_start_job (PkBackend *backend, PkBackendJob *job)
 		pk_backend_job_error_code (job,
 					   PK_ERROR_ENUM_LOCK_REQUIRED,
 					   "spawned backend requires lock");
+		pk_backend_job_finished (job);
 		return;
 	}
 }
@@ -142,6 +143,7 @@ pk_backend_get_details_local (PkBackend *backend, PkBackendJob *job, gchar **fil
 	/* Not supported for nix profile */
 	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
 				   "get-details-local not supported");
+	pk_backend_job_finished (job);
 }
 
 void
@@ -190,6 +192,7 @@ pk_backend_install_files (PkBackend *backend, PkBackendJob *job, PkBitfield tran
 	/* Not supported for nix profile */
 	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
 				   "install-files not supported - use nix profile install directly");
+	pk_backend_job_finished (job);
 }
 
 void
@@ -307,16 +310,19 @@ pk_backend_get_packages (PkBackend *backend, PkBackendJob *job, PkBitfield filte
 void
 pk_backend_get_repo_list (PkBackend *backend, PkBackendJob *job, PkBitfield filters)
 {
-	/* Nix doesn't have traditional repos - channels are handled differently */
-	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
-				   "Nix uses flakes/channels, not traditional repos");
+	/* Nix doesn't have traditional repos - we report a single "nixpkgs" source */
+	pk_backend_job_set_status (job, PK_STATUS_ENUM_QUERY);
+	pk_backend_job_repo_detail (job, "nixpkgs", "Nixpkgs", TRUE);
+	pk_backend_job_finished (job);
 }
 
 void
 pk_backend_repo_enable (PkBackend *backend, PkBackendJob *job, const gchar *repo_id, gboolean enabled)
 {
+	/* Nix channels can't be enabled/disabled via PackageKit */
 	pk_backend_job_error_code (job, PK_ERROR_ENUM_NOT_SUPPORTED,
-				   "Nix uses flakes/channels, not traditional repos");
+				   "Nix channels cannot be enabled/disabled via PackageKit");
+	pk_backend_job_finished (job);
 }
 
 const gchar *
