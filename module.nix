@@ -119,6 +119,49 @@ in {
       environment.sessionVariables.XDG_DATA_DIRS = [
         "$HOME/.nix-profile/share"
       ];
+
+      # Register MIME handlers from nix-profile apps (x-scheme-handler/* types)
+      # This is needed because nix-profile directories are read-only and can't have
+      # mimeinfo.cache generated, unlike system packages in environment.systemPackages
+      systemd.user.services.nix-profile-mime-handler = {
+        description = "Register MIME handlers from nix-profile applications";
+        wantedBy = ["default.target"];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        path = with pkgs; [coreutils gnugrep gnused];
+        script = ''
+          PROFILE_APPS="$HOME/.nix-profile/share/applications"
+          MIMEAPPS="$HOME/.config/mimeapps.list"
+
+          [ -d "$PROFILE_APPS" ] || exit 0
+
+          mkdir -p "$(dirname "$MIMEAPPS")"
+          touch "$MIMEAPPS"
+
+          # Ensure [Default Applications] section exists
+          grep -q '^\[Default Applications\]' "$MIMEAPPS" || \
+            echo -e "\n[Default Applications]" >> "$MIMEAPPS"
+
+          # Scan desktop files for x-scheme-handler entries
+          for desktop in "$PROFILE_APPS"/*.desktop; do
+            [ -f "$desktop" ] || continue
+            basename=$(basename "$desktop")
+
+            # Extract MimeType line and process x-scheme-handler entries
+            grep -h '^MimeType=' "$desktop" 2>/dev/null | \
+              sed 's/^MimeType=//' | tr ';' '\n' | \
+              grep '^x-scheme-handler/' | while read -r mime; do
+                [ -z "$mime" ] && continue
+                # Only add if not already set (preserves user customizations)
+                if ! grep -q "^$mime=" "$MIMEAPPS" 2>/dev/null; then
+                  sed -i "/^\[Default Applications\]/a $mime=$basename" "$MIMEAPPS"
+                fi
+              done
+          done
+        '';
+      };
     }
   ]);
 }
