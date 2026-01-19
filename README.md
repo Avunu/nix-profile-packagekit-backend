@@ -183,6 +183,55 @@ ls -la result/lib/packagekit-backend/
 ls -la result/share/PackageKit/helpers/nix-profile/
 ```
 
+## Software Bill of Materials (SBOM)
+
+This project includes support for generating and validating a Software Bill of Materials in CycloneDX format. The SBOM provides a complete inventory of all components and dependencies used in the project.
+
+### Generating SBOM
+
+To generate or update the SBOM:
+
+```bash
+python3 generate_sbom.py
+```
+
+This creates `sbom.json` in the project root, containing:
+- Project metadata and version information
+- All dependencies (Python packages, Nix packages, C libraries)
+- License information for each component
+- External references (VCS, issue tracker, websites)
+- Dependency relationships
+
+### Validating SBOM
+
+To validate the SBOM structure and integrity:
+
+```bash
+python3 validate_sbom.py
+```
+
+The validator checks:
+- CycloneDX format compliance
+- Required fields presence
+- Valid component references
+- Proper dependency relationships
+
+### SBOM Format
+
+The SBOM follows the [CycloneDX 1.5 specification](https://cyclonedx.org/specification/overview/), which is:
+- An OWASP standard for software bill of materials
+- Focused on security use cases and vulnerability management
+- Machine-readable JSON format
+- Widely supported by security scanning tools
+
+### Testing
+
+SBOM generation and validation are covered by automated tests:
+
+```bash
+pytest tests/test_sbom.py -v
+```
+
 ## License
 
 GPL-2.0-or-later (matching PackageKit)

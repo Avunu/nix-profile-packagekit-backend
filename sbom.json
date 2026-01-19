@@ -1,0 +1,166 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:packagekit-backend-nix-profile-6cbceb04",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-01-19T12:53:45.235869+00:00",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "PackageKit Nix Backend Contributors",
+          "name": "generate-sbom",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:github/Avunu/nix-profile-packagekit-backend@1.0.0",
+      "name": "packagekit-backend-nix-profile",
+      "version": "1.0.0",
+      "description": "PackageKit backend for Nix profile management",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/Avunu/nix-profile-packagekit-backend"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/Avunu/nix-profile-packagekit-backend"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/Avunu/nix-profile-packagekit-backend/issues"
+        }
+      ],
+      "properties": [
+        {
+          "name": "cdx:nix:commit",
+          "value": "6cbceb045c9dac597b35bded33f82aa58f7b9219"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/packagekit",
+      "name": "packagekit",
+      "description": "PackageKit Python bindings",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/PackageKit/PackageKit"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:nix/nix",
+      "name": "nix",
+      "description": "Nix package manager",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/NixOS/nix"
+        },
+        {
+          "type": "website",
+          "url": "https://nixos.org"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:nix/nix-search-cli",
+      "name": "nix-search-cli",
+      "description": "CLI tool for searching packages via search.nixos.org",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-3.0-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/peterldowns/nix-search-cli"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nix/glib",
+      "name": "glib",
+      "description": "GLib C utility library",
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://gitlab.gnome.org/GNOME/glib"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nix/pkg-config",
+      "name": "pkg-config",
+      "description": "Tool for managing library compile and link flags",
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-or-later"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.freedesktop.org/wiki/Software/pkg-config/"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:github/Avunu/nix-profile-packagekit-backend@1.0.0",
+      "dependsOn": [
+        "pkg:pypi/packagekit",
+        "pkg:nix/nix",
+        "pkg:nix/nix-search-cli",
+        "pkg:nix/glib",
+        "pkg:nix/pkg-config"
+      ]
+    }
+  ]
+}
