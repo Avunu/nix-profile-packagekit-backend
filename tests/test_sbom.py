@@ -10,8 +10,8 @@ import pytest
 # Add parent directory to path to import the scripts
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from generate_sbom import create_sbom  # noqa: E402
-from validate_sbom import SBOMValidator  # noqa: E402
+from generate_sbom import create_sbom
+from validate_sbom import SBOMValidator
 
 
 class TestSBOMGeneration:
@@ -243,7 +243,7 @@ class TestSBOMScripts:
 		# Check it's properly formatted JSON
 		sbom = json.loads(content)
 		# Re-serialize to check formatting
-		formatted = json.dumps(sbom, indent=2)
+		json.dumps(sbom, indent=2)
 
 		# Should have proper indentation
 		assert "  " in content

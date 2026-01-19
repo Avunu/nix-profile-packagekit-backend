@@ -8,7 +8,8 @@
   nix,
   nix-search-cli,
   packagekitSrc,
-}: let
+}:
+let
   backendName = "nix-profile";
 
   # Python backend as a proper Python application
@@ -19,13 +20,15 @@
 
     src = lib.cleanSourceWith {
       src = ./.;
-      filter = path: type: let
-        baseName = baseNameOf path;
-      in
+      filter =
+        path: type:
+        let
+          baseName = baseNameOf path;
+        in
         baseName != ".git" && baseName != "result" && baseName != "__pycache__";
     };
 
-    build-system = [python3.pkgs.setuptools];
+    build-system = [ python3.pkgs.setuptools ];
 
     dependencies = with python3.pkgs; [
       (toPythonModule packagekit)
@@ -35,7 +38,10 @@
       "--prefix"
       "PATH"
       ":"
-      "${lib.makeBinPath [nix nix-search-cli]}"
+      "${lib.makeBinPath [
+        nix
+        nix-search-cli
+      ]}"
     ];
 
     meta.mainProgram = "nix_profile_backend";
@@ -51,8 +57,11 @@
       filter = path: type: (baseNameOf path) == "pk-backend-nix-profile.c";
     };
 
-    nativeBuildInputs = [pkg-config];
-    buildInputs = [glib packagekit];
+    nativeBuildInputs = [ pkg-config ];
+    buildInputs = [
+      glib
+      packagekit
+    ];
 
     buildPhase = ''
       ${stdenv.cc}/bin/cc -shared -fPIC \
@@ -74,26 +83,26 @@
     dontStrip = true;
   };
 in
-  stdenv.mkDerivation {
-    pname = "packagekit-backend-nix-profile";
-    version = "1.0.0";
+stdenv.mkDerivation {
+  pname = "packagekit-backend-nix-profile";
+  version = "1.0.0";
 
-    dontUnpack = true;
+  dontUnpack = true;
 
-    installPhase = ''
-      mkdir -p $out/lib/packagekit-backend
-      mkdir -p $out/share/PackageKit/helpers/${backendName}
+  installPhase = ''
+    mkdir -p $out/lib/packagekit-backend
+    mkdir -p $out/share/PackageKit/helpers/${backendName}
 
-      # Link C backend
-      ln -s ${cBackend}/lib/packagekit-backend/*.so $out/lib/packagekit-backend/
+    # Link C backend
+    ln -s ${cBackend}/lib/packagekit-backend/*.so $out/lib/packagekit-backend/
 
-      # Link Python backend (the wrapped executable)
-      ln -s ${pythonBackend}/bin/nix_profile_backend $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py
-    '';
+    # Link Python backend (the wrapped executable)
+    ln -s ${pythonBackend}/bin/nix_profile_backend $out/share/PackageKit/helpers/${backendName}/nix_profile_backend.py
+  '';
 
-    meta = with lib; {
-      description = "PackageKit backend for Nix profile management";
-      license = licenses.gpl2Plus;
-      platforms = platforms.linux;
-    };
-  }
+  meta = with lib; {
+    description = "PackageKit backend for Nix profile management";
+    license = licenses.gpl2Plus;
+    platforms = platforms.linux;
+  };
+}

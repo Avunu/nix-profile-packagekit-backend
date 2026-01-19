@@ -52,6 +52,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import ClassVar
 from urllib.parse import urlparse
 
 import tldextract
@@ -413,7 +414,7 @@ class CorrelationEngine:
 	"""
 
 	# Git hosting platforms that need special URL handling
-	GIT_PLATFORMS = {
+	GIT_PLATFORMS: ClassVar[dict[str, str]] = {
 		"github": "io.github",
 		"gitlab": "io.gitlab",
 		"codeberg": "org.codeberg",
@@ -422,7 +423,7 @@ class CorrelationEngine:
 	}
 
 	# Special subdomains for git platforms
-	GIT_SUBDOMAINS = {
+	GIT_SUBDOMAINS: ClassVar[dict[tuple[str, str], str]] = {
 		("gitlab", "gnome"): "org.gnome",
 		("gitlab", "freedesktop"): "org.freedesktop",
 		("pages", "srht"): "io.srht",
@@ -477,7 +478,7 @@ class CorrelationEngine:
 			pname_to_packages[pname_lower].append(pkg)
 
 		# Strategy 1: Automatic pname + homepage matching
-		for flathub_id, component in flathub_components.items():
+		for flathub_id, _component in flathub_components.items():
 			# Parse Flathub ID parts
 			flathub_parts = flathub_id.lower().split(".")
 			if len(flathub_parts) < 2:
@@ -837,8 +838,8 @@ class AppStreamGenerator:
 			if icon_type == "cached" and icon.text:
 				# Point to our local icons
 				icon.set("type", "cached")
-				width = icon.get("width", "128")
-				height = icon.get("height", "128")
+				icon.get("width", "128")
+				icon.get("height", "128")
 				icon.text = f"{component.id}.png"
 
 		# If we have nixpkgs-specific info, we could override description etc.
@@ -1191,8 +1192,8 @@ def cmd_refresh(args):
 		license_info = meta.get("license", {})
 		if isinstance(license_info, list):
 			license_names = [
-				l.get("shortName", l.get("spdxId", "unknown")) if isinstance(l, dict) else str(l)
-				for l in license_info
+				lic.get("shortName", lic.get("spdxId", "unknown")) if isinstance(lic, dict) else str(lic)
+				for lic in license_info
 			]
 			license_str = " AND ".join(license_names)
 		elif isinstance(license_info, dict):
