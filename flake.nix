@@ -206,14 +206,14 @@
         # Development shell
         devShells.default = pkgs.mkShell {
           packages = [
-            pythonEnv
+            pkgs.glib
+            pkgs.nix-search-cli
+            pkgs.packagekit
+            pkgs.pkg-config
+            pkgs.pre-commit
             pkgs.pyright
             pkgs.ruff
-            pkgs.pre-commit
-            pkgs.pkg-config
-            pkgs.glib
-            pkgs.packagekit
-            pkgs.nix-search-cli
+            pythonEnv
           ];
 
           shellHook = ''

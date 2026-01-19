@@ -25,11 +25,11 @@ repos:
       - id: ruff-format
         name: "ruff format"
 
-  - repo: https://github.com/kamadorueda/alejandra
-    rev: 4.0.0
+  - repo: https://github.com/NixOS/nixfmt
+    rev: v1.2.0
     hooks:
-      - id: alejandra-nix
-        name: "alejandra nix format"
+      - id: nixfmt
+        name: "nixfmt format"
 
 ci:
   autoupdate_schedule: weekly
