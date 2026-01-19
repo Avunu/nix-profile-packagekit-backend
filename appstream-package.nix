@@ -1,83 +1,47 @@
-# AppStream data generator package
+# AppStream data package
 #
-# This generates AppStream metadata for nixpkgs by correlating package metadata
-# with Flathub's rich AppStream data (screenshots, descriptions, etc.)
+# This package ships pre-generated AppStream metadata for nixpkgs.
+# The metadata is generated during development by running:
+#   just generate
 #
-# The correlation is done purely via metadata matching:
-# - nixpkgs pname matches Flathub ID's last component
-# - nixpkgs homepage domain matches Flathub ID's domain part
-# - Special handling for GitHub/GitLab URLs
+# The generation process correlates nixpkgs package metadata with Flathub's
+# rich AppStream data (screenshots, descriptions, icons).
 #
-# The nixpkgs data is prepackaged in nixpkgs-apps.json and should be refreshed
-# periodically on a machine with access to nixpkgs source.
+# To refresh the data:
+#   1. just refresh   # Update nixpkgs-apps.json from local nixpkgs
+#   2. just generate  # Re-correlate and generate appstream-data/
+#   3. Commit the updated appstream-data/
 {
   lib,
   stdenv,
-  python3,
-  cacert,
-  # Optional: known mappings file (defaults to bundled file)
-  knownMappings ? ./known-mappings.json,
-  # Prepackaged nixpkgs data
-  nixpkgsData ? ./nixpkgs-apps.json,
 }:
-let
-  pythonWithDeps = python3.withPackages (ps: [ ps.tldextract ]);
-in
 stdenv.mkDerivation {
   pname = "nixos-appstream-data";
   version = "1.0.0";
 
-  # No source - we generate everything
-  dontUnpack = true;
+  # Pre-generated AppStream data
+  src = ./appstream-data;
 
-  nativeBuildInputs = [
-    pythonWithDeps
-    cacert
-  ];
-
-  # Need network access to download Flathub data
-  __noChroot = true;
-  SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
-
-  buildPhase = ''
-    runHook preBuild
-
-    export HOME=$TMPDIR
-    export NIX_SSL_CERT_FILE=$SSL_CERT_FILE
-
-    # Copy required files
-    cp ${./appstream.py} appstream.py
-    cp ${knownMappings} known-mappings.json
-    cp ${nixpkgsData} nixpkgs-apps.json
-
-    # Run the generator with prepackaged nixpkgs data
-    python appstream.py generate \
-      --output ./output \
-      --mappings known-mappings.json \
-      --nixpkgs-data nixpkgs-apps.json \
-      --cache-dir $TMPDIR/cache
-
-    runHook postBuild
-  '';
+  dontBuild = true;
 
   installPhase = ''
     runHook preInstall
 
     mkdir -p $out/share
-    cp -r output/swcatalog $out/share/
+    cp -r swcatalog $out/share/
 
     # Also provide legacy app-info location for compatibility
     mkdir -p $out/share/app-info
-    if [ -d output/swcatalog/xml ]; then
+    if [ -d swcatalog/xml ]; then
       ln -s ../swcatalog/xml $out/share/app-info/xmls
     fi
-    if [ -d output/swcatalog/icons ]; then
+    if [ -d swcatalog/icons ]; then
       ln -s ../swcatalog/icons $out/share/app-info/icons
     fi
 
     # Include the correlation report
-    if [ -f output/correlation-report.json ]; then
-      cp output/correlation-report.json $out/share/
+    if [ -f correlation-report.json ]; then
+      cp correlation-report.json $out/share/
     fi
 
     runHook postInstall
@@ -92,13 +56,8 @@ stdenv.mkDerivation {
       This provides screenshots, descriptions, and icons for GUI applications
       in GNOME Software and KDE Discover without needing to build packages.
 
-      Correlation is based on:
-      - Package name (pname) matching Flathub ID
-      - Homepage URL domain matching Flathub ID structure
-      - Manual mappings for edge cases
-
-      The nixpkgs-apps.json file should be regenerated periodically using
-      the companion refresh script on a machine with nixpkgs access.
+      The data is pre-generated during development and shipped as-is.
+      To update, run `just refresh` then `just generate` in the dev environment.
     '';
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
