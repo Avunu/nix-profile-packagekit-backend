@@ -187,9 +187,24 @@ ls -la result/share/PackageKit/helpers/nix-profile/
 
 This project includes support for generating and validating a Software Bill of Materials in CycloneDX format. The SBOM provides a complete inventory of all components and dependencies used in the project.
 
+### Quick Start
+
+Use the provided script for easy SBOM management:
+
+```bash
+# Generate SBOM
+./sbom.sh generate
+
+# Validate SBOM
+./sbom.sh validate
+
+# Update and validate SBOM (recommended)
+./sbom.sh update
+```
+
 ### Generating SBOM
 
-To generate or update the SBOM:
+To generate or update the SBOM manually:
 
 ```bash
 python3 generate_sbom.py
@@ -230,6 +245,18 @@ SBOM generation and validation are covered by automated tests:
 
 ```bash
 pytest tests/test_sbom.py -v
+```
+
+### Nix Integration
+
+Generate SBOM as part of the Nix build:
+
+```bash
+# Generate SBOM with Nix
+nix build .#sbom
+
+# Validate SBOM as part of checks
+nix flake check
 ```
 
 ## License

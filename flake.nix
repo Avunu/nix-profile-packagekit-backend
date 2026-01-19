@@ -135,6 +135,18 @@
           appstream-data-free = pkgs.nixos-appstream-data;
           appstream-data-unfree = pkgs.nixos-appstream-data-unfree;
           appstream-data-all = pkgs.nixos-appstream-data-all;
+
+          # SBOM generation package
+          sbom = pkgs.runCommand "sbom"
+            {
+              nativeBuildInputs = [ pkgs.python3 pkgs.git ];
+            }
+            ''
+              mkdir -p $out
+              cd ${./.}
+              python3 generate_sbom.py
+              cp sbom.json $out/
+            '';
         };
 
         # Checks (run with: nix flake check)
@@ -148,6 +160,21 @@
               ''
                 cd ${./.}
                 python -m pytest tests/ -v
+                touch $out
+              '';
+
+          # SBOM validation check
+          sbom-validation =
+            pkgs.runCommand "sbom-validation"
+              {
+                nativeBuildInputs = [ pkgs.python3 pkgs.git ];
+              }
+              ''
+                cd ${./.}
+                echo "Generating SBOM..."
+                python3 generate_sbom.py
+                echo "Validating SBOM..."
+                python3 validate_sbom.py
                 touch $out
               '';
 
