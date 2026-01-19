@@ -158,8 +158,8 @@ class NixpkgsLoader:
 		with open(self.data_file) as f:
 			data = json.load(f)
 
-		for pkg_data in data.get("packages", []):
-			attr = pkg_data.get("attr", "")
+		packages_data = data.get("packages", {})
+		for attr, pkg_data in packages_data.items():
 			if not attr:
 				continue
 

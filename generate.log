@@ -1,0 +1,30 @@
+python appstream.py generate --output ./appstream-data
+============================================================
+Step 1: Fetching Flathub AppStream data
+============================================================
+Using cached Flathub data (age: 2.7h)
+Parsing /home/batonac/.cache/nix-appstream/flathub-appstream.xml...
+Parsed 2862 desktop applications from Flathub
+
+============================================================
+Step 2: Loading nixpkgs metadata
+============================================================
+Loading nixpkgs data from /home/batonac/Development/nix-profile-packagekit-backend/nixpkgs-apps.json...
+Loaded 70468 packages
+
+============================================================
+Step 3: Correlating packages (pname + homepage matching)
+============================================================
+Created 1161 mappings
+  - High confidence (≥0.9): 701
+  - Medium confidence (0.7-0.9): 460
+  - Low confidence (<0.7): 0
+
+============================================================
+Step 4: Generating AppStream catalog
+============================================================
+Generating AppStream catalog with 1161 components...
+Generated catalog: appstream-data/swcatalog/xml/nixpkgs.xml.gz
+Downloaded 1049 icons
+Generated report: appstream-data/correlation-report.json
+Coverage: 40.6%
