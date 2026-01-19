@@ -36,6 +36,7 @@ Usage:
     python appstream.py info firefox
     python appstream.py match org.videolan.VLC
     python appstream.py correlate --report ./correlation-report.json
+    python appstream.py refresh --output ./nixpkgs-apps.json
 """
 
 from __future__ import annotations
@@ -44,10 +45,12 @@ import argparse
 import gzip
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -452,6 +455,7 @@ class CorrelationEngine:
 		Correlate Flathub components with nixpkgs packages.
 
 		Uses intelligent matching based on pname and homepage analysis.
+		Known mappings are applied as overrides for cases where auto-matching fails.
 
 		Args:
 		    flathub_components: Dict of flathub_id -> FlathubComponent
@@ -472,27 +476,8 @@ class CorrelationEngine:
 				pname_to_packages[pname_lower] = []
 			pname_to_packages[pname_lower].append(pkg)
 
-		# Strategy 1: Known manual mappings (highest confidence)
-		for flathub_id, nixpkgs_attr in self._known_mappings.items():
-			if flathub_id in flathub_components and nixpkgs_attr in nixpkgs_packages:
-				pkg = nixpkgs_packages[nixpkgs_attr]
-				mappings.append(
-					AppStreamMapping(
-						flathub_id=flathub_id,
-						nixpkgs_attr=nixpkgs_attr,
-						nixpkgs_version=pkg.version,
-						confidence=1.0,
-						match_reason="known mapping",
-					)
-				)
-				matched_flathub_ids.add(flathub_id)
-				matched_nix_attrs.add(nixpkgs_attr)
-
-		# Strategy 2: Intelligent pname + homepage matching
+		# Strategy 1: Automatic pname + homepage matching
 		for flathub_id, component in flathub_components.items():
-			if flathub_id in matched_flathub_ids:
-				continue
-
 			# Parse Flathub ID parts
 			flathub_parts = flathub_id.lower().split(".")
 			if len(flathub_parts) < 2:
@@ -523,6 +508,42 @@ class CorrelationEngine:
 				)
 				matched_flathub_ids.add(flathub_id)
 				matched_nix_attrs.add(pkg.attr)
+
+		# Strategy 2: Apply known mappings as overrides
+		# These fix incorrect auto-matches or add missing mappings
+		for flathub_id, nixpkgs_attr in self._known_mappings.items():
+			if flathub_id not in flathub_components or nixpkgs_attr not in nixpkgs_packages:
+				continue
+
+			pkg = nixpkgs_packages[nixpkgs_attr]
+
+			# Check if we already have a mapping for this flathub_id
+			existing_idx = None
+			for i, m in enumerate(mappings):
+				if m.flathub_id == flathub_id:
+					existing_idx = i
+					break
+
+			new_mapping = AppStreamMapping(
+				flathub_id=flathub_id,
+				nixpkgs_attr=nixpkgs_attr,
+				nixpkgs_version=pkg.version,
+				confidence=1.0,
+				match_reason="override mapping",
+			)
+
+			if existing_idx is not None:
+				# Replace existing mapping (override)
+				old_attr = mappings[existing_idx].nixpkgs_attr
+				if old_attr != nixpkgs_attr:
+					matched_nix_attrs.discard(old_attr)
+				mappings[existing_idx] = new_mapping
+			else:
+				# Add new mapping
+				mappings.append(new_mapping)
+				matched_flathub_ids.add(flathub_id)
+
+			matched_nix_attrs.add(nixpkgs_attr)
 
 		# Sort by confidence
 		mappings.sort(key=lambda m: (-m.confidence, m.flathub_id))
@@ -847,9 +868,10 @@ class AppStreamGenerator:
 			"total_mappings": len(mappings),
 			"coverage_percent": (len(mappings) / len(flathub_components) * 100) if flathub_components else 0,
 			"by_confidence": {
-				"exact_match": len([m for m in mappings if m.confidence == 1.0]),
-				"known_mapping": len([m for m in mappings if 0.9 <= m.confidence < 1.0]),
-				"heuristic": len([m for m in mappings if m.confidence < 0.9]),
+				"override": len([m for m in mappings if m.confidence == 1.0]),
+				"high": len([m for m in mappings if 0.9 <= m.confidence < 1.0]),
+				"medium": len([m for m in mappings if 0.6 <= m.confidence < 0.9]),
+				"low": len([m for m in mappings if m.confidence < 0.6]),
 			},
 			"mappings": [
 				{
@@ -1095,6 +1117,122 @@ def cmd_correlate(args):
 	print(f"Report written to: {output_path}")
 
 
+def cmd_refresh(args):
+	"""Refresh nixpkgs-apps.json by querying local nixpkgs."""
+	print("Querying local nixpkgs for package metadata...")
+	print("This may take a minute or two...")
+
+	# Use nix-env to query all packages with JSON output
+	# This gives us: name, pname, version, description, meta.homepage, meta.license
+	nixpkgs_arg = []
+	if hasattr(args, "nixpkgs") and args.nixpkgs:
+		nixpkgs_arg = ["-f", args.nixpkgs]
+
+	try:
+		result = subprocess.run(
+			["nix-env", *nixpkgs_arg, "-qaP", "--json", "--meta"],
+			capture_output=True,
+			text=True,
+			check=True,
+		)
+	except subprocess.CalledProcessError as e:
+		print(f"Error querying nixpkgs: {e.stderr}")
+		sys.exit(1)
+	except FileNotFoundError:
+		print("Error: nix-env not found. Make sure Nix is installed.")
+		sys.exit(1)
+
+	raw_packages = json.loads(result.stdout)
+	print(f"Found {len(raw_packages)} total packages")
+
+	# Filter to likely GUI applications
+	# Heuristics: has a homepage, not a library (doesn't start with lib),
+	# not a font, not a -unwrapped variant, etc.
+	packages = {}
+	skipped = {"no_pname": 0, "library": 0, "font": 0, "unwrapped": 0, "module": 0}
+
+	for attr, data in raw_packages.items():
+		meta = data.get("meta", {})
+		pname = data.get("pname", "")
+
+		# Skip packages without pname
+		if not pname:
+			skipped["no_pname"] += 1
+			continue
+
+		# Skip obvious non-applications
+		pname_lower = pname.lower()
+		if pname_lower.startswith("lib") and not pname_lower.startswith("libre"):
+			skipped["library"] += 1
+			continue
+		if "font" in pname_lower or pname_lower.endswith("-fonts"):
+			skipped["font"] += 1
+			continue
+		if pname_lower.endswith("-unwrapped"):
+			skipped["unwrapped"] += 1
+			continue
+		if attr.startswith("python") and "Packages" in attr:
+			skipped["module"] += 1
+			continue
+		if attr.startswith("perl") and "Packages" in attr:
+			skipped["module"] += 1
+			continue
+		if attr.startswith("haskellPackages."):
+			skipped["module"] += 1
+			continue
+		if attr.startswith("nodePackages."):
+			skipped["module"] += 1
+			continue
+		if attr.startswith("rubyGems."):
+			skipped["module"] += 1
+			continue
+
+		# Extract license info
+		license_info = meta.get("license", {})
+		if isinstance(license_info, list):
+			license_names = [
+				l.get("shortName", l.get("spdxId", "unknown")) if isinstance(l, dict) else str(l)
+				for l in license_info
+			]
+			license_str = " AND ".join(license_names)
+		elif isinstance(license_info, dict):
+			license_str = license_info.get("shortName", license_info.get("spdxId", "unknown"))
+		else:
+			license_str = str(license_info) if license_info else None
+
+		packages[attr] = {
+			"attr": attr,
+			"pname": pname,
+			"version": data.get("version", ""),
+			"description": meta.get("description", ""),
+			"homepage": meta.get("homepage", ""),
+			"license": license_str,
+		}
+
+	print(f"Filtered to {len(packages)} candidate applications")
+	print(f"Skipped: {skipped}")
+
+	# Build output structure
+	output = {
+		"_meta": {
+			"generated": datetime.now(UTC).isoformat(),
+			"source": args.nixpkgs if hasattr(args, "nixpkgs") and args.nixpkgs else "default nixpkgs",
+			"total_packages": len(raw_packages),
+			"filtered_packages": len(packages),
+		},
+		"packages": packages,
+	}
+
+	# Write output
+	output_path = Path(args.output)
+	output_path.parent.mkdir(parents=True, exist_ok=True)
+	with open(output_path, "w") as f:
+		json.dump(output, f, indent=2)
+
+	print(f"\nWrote {len(packages)} packages to {output_path}")
+	print(f"Total nixpkgs queried: {len(raw_packages)}")
+
+
 def main():
 	"""CLI entry point."""
 	parser = argparse.ArgumentParser(
@@ -1178,6 +1316,22 @@ def main():
 	)
 	add_common_args(corr_parser)
 	corr_parser.set_defaults(func=cmd_correlate)
+
+	# Refresh command - regenerate nixpkgs-apps.json from local nixpkgs
+	refresh_parser = subparsers.add_parser(
+		"refresh", help="Refresh nixpkgs-apps.json by querying local nixpkgs"
+	)
+	refresh_parser.add_argument(
+		"-o",
+		"--output",
+		default="./nixpkgs-apps.json",
+		help="Output path for nixpkgs data JSON",
+	)
+	refresh_parser.add_argument(
+		"--nixpkgs",
+		help="Path to nixpkgs (optional, uses default if not specified)",
+	)
+	refresh_parser.set_defaults(func=cmd_refresh)
 
 	args = parser.parse_args()
 

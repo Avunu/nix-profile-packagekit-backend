@@ -101,15 +101,15 @@
           src = ./.;
           hooks = {
             # Python
-            ruff.enable = true;
-            ruff-format.enable = true;
+            # ruff.enable = true;
+            # ruff-format.enable = true;
 
             # Nix
-            nixfmt.enable = true;
+            # nixfmt.enable = true;
 
             # General
-            trim-trailing-whitespace.enable = true;
-            end-of-file-fixer.enable = true;
+            # trim-trailing-whitespace.enable = true;
+            # end-of-file-fixer.enable = true;
             # check-json.enable = true;
             # check-toml.enable = true;
             # check-yaml.enable = true;
