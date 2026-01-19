@@ -1,0 +1,344 @@
+{
+  "_comment": "Prepackaged nixpkgs application metadata for AppStream correlation",
+  "_generated": "2026-01-19T00:00:00Z",
+  "_source": "nixpkgs-unstable",
+  "_instructions": "Regenerate this file by running: nix-appstream refresh (on a machine with nixpkgs access)",
+  "packages": [
+    {
+      "attr": "firefox",
+      "pname": "firefox",
+      "version": "134.0",
+      "description": "A web browser built from Firefox source tree",
+      "homepage": "https://www.mozilla.org/firefox/",
+      "license": "MPL-2.0"
+    },
+    {
+      "attr": "vlc",
+      "pname": "vlc",
+      "version": "3.0.21",
+      "description": "Cross-platform media player and streaming server",
+      "homepage": "https://www.videolan.org/vlc/",
+      "license": "LGPL-2.1-or-later"
+    },
+    {
+      "attr": "gimp",
+      "pname": "gimp",
+      "version": "2.10.38",
+      "description": "The GNU Image Manipulation Program",
+      "homepage": "https://www.gimp.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "libreoffice",
+      "pname": "libreoffice",
+      "version": "24.8.4.2",
+      "description": "Comprehensive, professional-quality productivity suite",
+      "homepage": "https://libreoffice.org/",
+      "license": "MPL-2.0"
+    },
+    {
+      "attr": "chromium",
+      "pname": "chromium",
+      "version": "131.0.6778.204",
+      "description": "An open source web browser from Google",
+      "homepage": "https://www.chromium.org/Home",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "attr": "thunderbird",
+      "pname": "thunderbird",
+      "version": "128.5.2",
+      "description": "A full-featured e-mail client",
+      "homepage": "https://www.thunderbird.net/",
+      "license": "MPL-2.0"
+    },
+    {
+      "attr": "inkscape",
+      "pname": "inkscape",
+      "version": "1.4",
+      "description": "Vector graphics editor",
+      "homepage": "https://www.inkscape.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "blender",
+      "pname": "blender",
+      "version": "4.3.2",
+      "description": "3D Creation/Animation/Publishing System",
+      "homepage": "https://www.blender.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "audacity",
+      "pname": "audacity",
+      "version": "3.7.1",
+      "description": "Sound editor with graphical UI",
+      "homepage": "https://www.audacityteam.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "obs-studio",
+      "pname": "obs-studio",
+      "version": "31.0.0",
+      "description": "Free and open source software for video recording and live streaming",
+      "homepage": "https://obsproject.com/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "kdenlive",
+      "pname": "kdenlive",
+      "version": "24.12.1",
+      "description": "Video editor",
+      "homepage": "https://kdenlive.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "krita",
+      "pname": "krita",
+      "version": "5.2.6",
+      "description": "A free and open source painting application",
+      "homepage": "https://krita.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "signal-desktop",
+      "pname": "signal-desktop",
+      "version": "7.37.0",
+      "description": "Private, simple, and secure messenger",
+      "homepage": "https://signal.org/",
+      "license": "AGPL-3.0-only"
+    },
+    {
+      "attr": "discord",
+      "pname": "discord",
+      "version": "0.0.75",
+      "description": "All-in-one voice and text chat for gamers",
+      "homepage": "https://discordapp.com/",
+      "license": "unfree"
+    },
+    {
+      "attr": "telegram-desktop",
+      "pname": "telegram-desktop",
+      "version": "5.10.3",
+      "description": "Telegram Desktop messaging app",
+      "homepage": "https://desktop.telegram.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "element-desktop",
+      "pname": "element-desktop",
+      "version": "1.11.91",
+      "description": "A glossy Matrix collaboration client for desktop",
+      "homepage": "https://element.io/",
+      "license": "Apache-2.0"
+    },
+    {
+      "attr": "slack",
+      "pname": "slack",
+      "version": "4.41.105",
+      "description": "Desktop client for Slack",
+      "homepage": "https://slack.com/",
+      "license": "unfree"
+    },
+    {
+      "attr": "spotify",
+      "pname": "spotify",
+      "version": "1.2.52.442",
+      "description": "Play music from the Spotify music service",
+      "homepage": "https://www.spotify.com/",
+      "license": "unfree"
+    },
+    {
+      "attr": "mpv",
+      "pname": "mpv",
+      "version": "0.39.0",
+      "description": "General-purpose media player, fork of MPlayer and mplayer2",
+      "homepage": "https://mpv.io/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "celluloid",
+      "pname": "celluloid",
+      "version": "0.27",
+      "description": "Simple GTK frontend for mpv",
+      "homepage": "https://celluloid-player.github.io/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "gnome-text-editor",
+      "pname": "gnome-text-editor",
+      "version": "47.2",
+      "description": "A simple text editor for GNOME",
+      "homepage": "https://apps.gnome.org/TextEditor/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "gedit",
+      "pname": "gedit",
+      "version": "48.2",
+      "description": "Official text editor of the GNOME desktop environment",
+      "homepage": "https://gedit-technology.github.io/apps/gedit/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "gnome-calculator",
+      "pname": "gnome-calculator",
+      "version": "47.0",
+      "description": "Application that solves mathematical equations",
+      "homepage": "https://apps.gnome.org/Calculator/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "eog",
+      "pname": "eog",
+      "version": "45.4",
+      "description": "GNOME image viewer",
+      "homepage": "https://apps.gnome.org/Loupe/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "evince",
+      "pname": "evince",
+      "version": "46.3.1",
+      "description": "GNOME's document viewer",
+      "homepage": "https://apps.gnome.org/Evince/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "nautilus",
+      "pname": "nautilus",
+      "version": "47.2",
+      "description": "The file manager for GNOME",
+      "homepage": "https://apps.gnome.org/Nautilus/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "gnome-terminal",
+      "pname": "gnome-terminal",
+      "version": "3.54.2",
+      "description": "The GNOME Terminal Emulator",
+      "homepage": "https://apps.gnome.org/Console/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "vscode",
+      "pname": "vscode",
+      "version": "1.96.4",
+      "description": "Open source source code editor developed by Microsoft",
+      "homepage": "https://code.visualstudio.com/",
+      "license": "unfree"
+    },
+    {
+      "attr": "vscodium",
+      "pname": "vscodium",
+      "version": "1.96.4",
+      "description": "Open source source code editor developed by Microsoft without branding/telemetry",
+      "homepage": "https://vscodium.com/",
+      "license": "MIT"
+    },
+    {
+      "attr": "kate",
+      "pname": "kate",
+      "version": "24.12.1",
+      "description": "Advanced text editor for KDE",
+      "homepage": "https://kate-editor.org/",
+      "license": "LGPL-2.0-or-later"
+    },
+    {
+      "attr": "dolphin",
+      "pname": "dolphin",
+      "version": "24.12.1",
+      "description": "KDE file manager",
+      "homepage": "https://apps.kde.org/dolphin/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "konsole",
+      "pname": "konsole",
+      "version": "24.12.1",
+      "description": "KDE terminal emulator",
+      "homepage": "https://konsole.kde.org/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "okular",
+      "pname": "okular",
+      "version": "24.12.1",
+      "description": "KDE document viewer",
+      "homepage": "https://okular.kde.org/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "gwenview",
+      "pname": "gwenview",
+      "version": "24.12.1",
+      "description": "KDE image viewer",
+      "homepage": "https://apps.kde.org/gwenview/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "ark",
+      "pname": "ark",
+      "version": "24.12.1",
+      "description": "Graphical file compression/decompression utility for KDE",
+      "homepage": "https://apps.kde.org/ark/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "handbrake",
+      "pname": "handbrake",
+      "version": "1.9.1",
+      "description": "A tool for converting video files",
+      "homepage": "https://handbrake.fr/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "transmission-gtk",
+      "pname": "transmission",
+      "version": "4.0.6",
+      "description": "A fast, easy and free BitTorrent client",
+      "homepage": "https://transmissionbt.com/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "qbittorrent",
+      "pname": "qbittorrent",
+      "version": "5.0.3",
+      "description": "Featureful free software BitTorrent client",
+      "homepage": "https://www.qbittorrent.org/",
+      "license": "GPL-2.0-or-later"
+    },
+    {
+      "attr": "deluge",
+      "pname": "deluge",
+      "version": "2.1.1",
+      "description": "Torrent client",
+      "homepage": "https://deluge-torrent.org/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "steam",
+      "pname": "steam",
+      "version": "1.0.0.81",
+      "description": "A digital distribution platform",
+      "homepage": "https://store.steampowered.com/",
+      "license": "unfree"
+    },
+    {
+      "attr": "lutris",
+      "pname": "lutris",
+      "version": "0.5.18",
+      "description": "Open Source gaming platform for GNU/Linux",
+      "homepage": "https://lutris.net/",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "attr": "heroic",
+      "pname": "heroic",
+      "version": "2.16.0",
+      "description": "A Native GOG, Amazon and Epic Games Launcher for Linux",
+      "homepage": "https://heroicgameslauncher.com/",
+      "license": "GPL-3.0-or-later"
+    }
+  ]
+}

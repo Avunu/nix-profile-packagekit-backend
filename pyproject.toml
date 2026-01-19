@@ -5,16 +5,20 @@ description = "PackageKit backend for Nix profile management"
 readme = "README.md"
 license = "GPL-2.0-or-later"
 requires-python = ">=3.11"
+dependencies = [
+	"tldextract>=5.0",
+]
 
 [project.scripts]
 nix_profile_backend = "nix_profile_backend:main"
+nix-appstream = "appstream:main"
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["nix_profile_backend", "nix_profile", "nix_search"]
+py-modules = ["nix_profile_backend", "nix_profile", "nix_search", "appstream"]
 
 [tool.ruff]
 line-length = 110
