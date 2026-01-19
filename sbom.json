@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:packagekit-backend-nix-profile-e3c1a44c",
+  "serialNumber": "urn:uuid:packagekit-backend-nix-profile-a5774cdd",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-01-19T12:55:52.077478+00:00",
+    "timestamp": "2026-01-19T12:58:47.976405+00:00",
     "tools": {
       "components": [
         {
@@ -45,7 +45,7 @@
       "properties": [
         {
           "name": "cdx:nix:commit",
-          "value": "e3c1a44c488aa8776eca29a9d5463ab19a2f9f9f"
+          "value": "a5774cddc215642e19e6e1d5884da0102961d98d"
         }
       ]
     }
