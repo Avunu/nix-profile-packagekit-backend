@@ -196,15 +196,17 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		"""
 		cmd = ["nix", *args]
 
-		# Inject --profile flag for profile operations to target the user's profile
+		# Inject --profile and --impure flags for profile operations to target the user's profile
 		# This ensures we modify the requesting user's profile, not root's
-		# Command structure: nix profile <action> [--profile <path>] <args>
-		# e.g., nix profile install --profile /path/to/profile nixpkgs#pkg
+		# --impure allows importing environment variables (e.g., NIXPKGS_ALLOW_UNFREE)
+		# Command structure: nix profile <action> [--profile <path>] [--impure] <args>
+		# e.g., nix profile install --profile /path/to/profile --impure nixpkgs#pkg
 		if use_profile and len(args) >= 2 and args[0] == "profile":
-			# Insert --profile after the action (install/remove/upgrade)
+			# Insert --profile and --impure after the action (install/remove/upgrade)
 			# cmd is ["nix", "profile", "action", ...], so insert at index 3
 			cmd.insert(3, "--profile")
 			cmd.insert(4, self._profile_path)
+			cmd.insert(5, "--impure")
 
 		if parse_json and "--log-format" not in " ".join(args):
 			cmd.extend(["--log-format", "internal-json"])
