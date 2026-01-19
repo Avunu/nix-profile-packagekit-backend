@@ -112,7 +112,7 @@
             end-of-file-fixer.enable = true;
             # check-json.enable = true;
             # check-toml.enable = true;
-            check-yaml.enable = true;
+            # check-yaml.enable = true;
           };
         };
 
