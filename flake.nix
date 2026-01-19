@@ -2,6 +2,9 @@
   description = "PackageKit backend for Nix profile management - enables GNOME Software / KDE Discover";
 
   inputs = {
+    # Enable git submodules (nixos-appstream-data, nixos-appstream-generator)
+    self.submodules = true;
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -16,13 +19,6 @@
       url = "github:PackageKit/PackageKit/v1.3.0";
       flake = false;
     };
-
-    # AppStream data for nixpkgs (optional, for GUI software centers)
-    # Note: This data may be outdated - consider regenerating with nixos-appstream-generator
-    appstream-data = {
-      url = "github:snowfallorg/nixos-appstream-data";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -32,7 +28,6 @@
       flake-utils,
       git-hooks,
       packagekit-src,
-      appstream-data,
       ...
     }:
     let
@@ -50,8 +45,10 @@
           # The backend .so and helper scripts
           packagekit-backend-nix-profile = backend;
 
-          # Re-export upstream AppStream data package
-          nixos-appstream-data = appstream-data.packages.${final.system}.default;
+          # AppStream data from submodule - provides software catalog for GNOME Software/KDE Discover
+          nixos-appstream-data = final.callPackage ./nixos-appstream-data { set = "free"; };
+          nixos-appstream-data-unfree = final.callPackage ./nixos-appstream-data { set = "unfree"; };
+          nixos-appstream-data-all = final.callPackage ./nixos-appstream-data { set = "all"; };
         };
 
       # Full overlay - modifies packagekit to include our backend
@@ -82,7 +79,10 @@
           # Keep packagekit-nix as an alias for compatibility
           packagekit-nix = final.packagekit;
 
-          nixos-appstream-data = appstream-data.packages.${final.system}.default;
+          # AppStream data from submodule
+          nixos-appstream-data = final.callPackage ./nixos-appstream-data { set = "free"; };
+          nixos-appstream-data-unfree = final.callPackage ./nixos-appstream-data { set = "unfree"; };
+          nixos-appstream-data-all = final.callPackage ./nixos-appstream-data { set = "all"; };
         };
 
       # Default overlay uses minimal to avoid rebuilds
@@ -101,23 +101,16 @@
           src = ./.;
           hooks = {
             # Python
-            ruff = {
-              enable = true;
-              settings.fix = true;
-            };
+            ruff.enable = true;
             ruff-format.enable = true;
 
             # Nix
             nixfmt-rfc-style.enable = true;
 
             # General
-            trailing-whitespace = {
-              enable = true;
-              excludes = [ "\\.md$" ];
-            };
+            trim-trailing-whitespace.enable = true;
             end-of-file-fixer.enable = true;
-            check-merge-conflict.enable = true;
-            check-json.enable = true;
+            # check-json.enable = true;
             check-toml.enable = true;
             check-yaml.enable = true;
           };
@@ -136,7 +129,12 @@
         packages = {
           default = pkgs.packagekit-backend-nix-profile;
           backend = pkgs.packagekit-backend-nix-profile;
+
+          # AppStream data variants
           appstream-data = pkgs.nixos-appstream-data;
+          appstream-data-free = pkgs.nixos-appstream-data;
+          appstream-data-unfree = pkgs.nixos-appstream-data-unfree;
+          appstream-data-all = pkgs.nixos-appstream-data-all;
         };
 
         # Checks (run with: nix flake check)

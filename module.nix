@@ -4,14 +4,15 @@
   pkgs,
   ...
 }:
-with lib; let
+with lib;
+let
   cfg = config.services.packagekit.backends.nix-profile;
 
   # Get the backend package without modifying packagekit
   backend = pkgs.packagekit-backend-nix-profile;
 
   # Create a merged backends directory with both original and our backend
-  mergedBackends = pkgs.runCommand "packagekit-backends-merged" {} ''
+  mergedBackends = pkgs.runCommand "packagekit-backends-merged" { } ''
     mkdir -p $out/lib/packagekit-backend
     # Link all backends from the original packagekit
     for f in ${pkgs.packagekit}/lib/packagekit-backend/*.so; do
@@ -30,7 +31,8 @@ with lib; let
     fi
     ln -sfn ${backend}/share/PackageKit/helpers/nix-profile $out/share/PackageKit/helpers/nix-profile
   '';
-in {
+in
+{
   options.services.packagekit.backends.nix-profile = {
     enable = mkEnableOption "PackageKit Nix profile backend for managing user packages";
 
@@ -95,22 +97,25 @@ in {
 
     # AppStream data for GNOME Software / KDE Discover
     (mkIf (cfg.appstream.enable && cfg.appstream.package != null) {
-      environment.systemPackages = [cfg.appstream.package];
+      environment.systemPackages = [ cfg.appstream.package ];
 
       environment.pathsToLink = [
-        "/share/app-info"
         "/share/swcatalog"
+        "/share/app-info" # Legacy compatibility
       ];
 
-      systemd.tmpfiles.rules = let
-        appstreamPkg = cfg.appstream.package;
-      in [
-        "d /usr/share 0755 root root -"
-        "d /usr/share/swcatalog 0755 root root -"
-        "L+ /usr/share/swcatalog/xml - - - - ${appstreamPkg}/share/app-info/xmls"
-        "L+ /usr/share/swcatalog/icons - - - - ${appstreamPkg}/share/app-info/icons"
-        "L+ /usr/share/app-info - - - - ${appstreamPkg}/share/app-info"
-      ];
+      # Create symlinks in /usr/share for AppStream to find the catalog
+      # AppStream looks in /usr/share/swcatalog by default on most distros
+      systemd.tmpfiles.rules =
+        let
+          appstreamPkg = cfg.appstream.package;
+        in
+        [
+          "d /usr/share 0755 root root -"
+          "d /usr/share/swcatalog 0755 root root -"
+          "L+ /usr/share/swcatalog/xml - - - - ${appstreamPkg}/share/swcatalog/xml"
+          "L+ /usr/share/swcatalog/icons - - - - ${appstreamPkg}/share/swcatalog/icons"
+        ];
     })
 
     # Ensure ~/.nix-profile/share is in XDG_DATA_DIRS for desktop file discovery
@@ -125,12 +130,16 @@ in {
       # mimeinfo.cache generated, unlike system packages in environment.systemPackages
       systemd.user.services.nix-profile-mime-handler = {
         description = "Register MIME handlers from nix-profile applications";
-        wantedBy = ["default.target"];
+        wantedBy = [ "default.target" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
-        path = with pkgs; [coreutils gnugrep gnused];
+        path = with pkgs; [
+          coreutils
+          gnugrep
+          gnused
+        ];
         script = ''
           PROFILE_APPS="$HOME/.nix-profile/share/applications"
           MIMEAPPS="$HOME/.config/mimeapps.list"

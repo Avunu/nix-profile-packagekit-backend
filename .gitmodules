@@ -1,3 +1,7 @@
 [submodule "nixos-appstream-data"]
 	path = nixos-appstream-data
-	url = https://github.com/snowfallorg/nixos-appstream-data.git
+	url = https://github.com/Avunu/nixos-appstream-data.git
+
+[submodule "nixos-appstream-generator"]
+	path = nixos-appstream-generator
+	url = https://github.com/Avunu/nixos-appstream-generator.git
