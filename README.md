@@ -185,51 +185,59 @@ ls -la result/share/PackageKit/helpers/nix-profile/
 
 ## Software Bill of Materials (SBOM)
 
-This project includes support for generating and validating a Software Bill of Materials in CycloneDX format. The SBOM provides a complete inventory of all components and dependencies used in the project.
+This project uses [bombon](https://github.com/nikstur/bombon), a Nix-native tool for generating CycloneDX Software Bills of Materials. The SBOM provides a complete inventory of all components and their dependencies directly from the Nix store.
 
-### Quick Start
+### Why bombon?
 
-Use the provided script for easy SBOM management:
-
-```bash
-# Generate SBOM
-./sbom.sh generate
-
-# Validate SBOM
-./sbom.sh validate
-
-# Update and validate SBOM (recommended)
-./sbom.sh update
-```
+- **Nix-native**: Directly queries Nix derivations for accurate dependency information
+- **Complete dependency tracking**: Automatically captures all runtime and build-time dependencies
+- **Standards compliance**: Meets TR-03183 v2.0.0 (BSI) and US Executive Order 14028
+- **CycloneDX format**: Industry-standard SBOM format compatible with security scanners
 
 ### Generating SBOM
 
-To generate or update the SBOM manually:
+Using Nix (recommended):
 
 ```bash
-python3 generate_sbom.py
+# Generate SBOM for the backend package
+nix build .#sbom
+
+# View the generated SBOM
+cat result/bom.json
 ```
 
-This creates `sbom.json` in the project root, containing:
-- Project metadata and version information
-- All dependencies (Python packages, Nix packages, C libraries)
-- License information for each component
-- External references (VCS, issue tracker, websites)
-- Dependency relationships
+The SBOM includes:
+- Complete dependency closure from Nix store
+- Package metadata and versions
+- License information
+- Component relationships
+- Cryptographic hashes
 
 ### Validating SBOM
 
 To validate the SBOM structure and integrity:
 
+### Validating SBOM
+
+Validation is integrated into the Nix build checks:
+
 ```bash
-python3 validate_sbom.py
+# Run all checks including SBOM validation
+nix flake check
 ```
 
-The validator checks:
-- CycloneDX format compliance
-- Required fields presence
-- Valid component references
-- Proper dependency relationships
+For manual validation, you can use standard JSON tools:
+
+```bash
+# Validate JSON structure
+jq empty result/bom.json
+
+# Extract component information
+jq '.components[] | {name, version, type}' result/bom.json
+
+# List all licenses
+jq '.components[].licenses' result/bom.json
+```
 
 ### SBOM Format
 
@@ -237,27 +245,33 @@ The SBOM follows the [CycloneDX 1.5 specification](https://cyclonedx.org/specifi
 - An OWASP standard for software bill of materials
 - Focused on security use cases and vulnerability management
 - Machine-readable JSON format
-- Widely supported by security scanning tools
+- Widely supported by security scanning tools (Grype, Trivy, etc.)
 
-### Testing
+### Using the SBOM
 
-SBOM generation and validation are covered by automated tests:
-
-```bash
-pytest tests/test_sbom.py -v
-```
-
-### Nix Integration
-
-Generate SBOM as part of the Nix build:
+Scan for vulnerabilities:
 
 ```bash
-# Generate SBOM with Nix
-nix build .#sbom
+# Using Grype
+grype sbom:result/bom.json
 
-# Validate SBOM as part of checks
-nix flake check
+# Using Trivy  
+trivy sbom result/bom.json
 ```
+
+### Legacy Python Scripts
+
+For backwards compatibility, Python scripts for basic SBOM generation are included:
+
+```bash
+# Generate basic SBOM (manual dependencies only)
+python3 generate_sbom.py
+
+# Validate generated SBOM
+python3 validate_sbom.py
+```
+
+**Note**: The Nix-native bombon approach is recommended as it provides complete and accurate dependency information directly from the Nix store.
 
 ## License
 
