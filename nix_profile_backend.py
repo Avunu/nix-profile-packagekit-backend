@@ -28,6 +28,7 @@ Backend name: nix-profile
 """
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -211,9 +212,23 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		if parse_json and "--log-format" not in " ".join(args):
 			cmd.extend(["--log-format", "internal-json"])
 
+		# Build environment with NIXPKGS_ALLOW_* variables
+		# This is critical for packages with unfree/insecure licenses
+		env = os.environ.copy()
+		# Ensure common allow flags are passed through
+		for key in list(env.keys()):
+			if key.startswith("NIXPKGS_ALLOW_"):
+				# Keep these in the environment
+				pass
+
 		try:
 			process = subprocess.Popen(
-				cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, bufsize=1
+				cmd,
+				stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE,
+				universal_newlines=True,
+				bufsize=1,
+				env=env,
 			)
 
 			stdout_lines = []
@@ -232,7 +247,11 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			stdout_lines.append(stdout)
 			stderr_lines.append(remaining_stderr)
 
-			return (process.returncode, "".join(stdout_lines), "".join(stderr_lines))
+			# Filter out JSON log lines from stderr to get clean error messages
+			raw_stderr = "".join(stderr_lines)
+			filtered_stderr = self._filter_nix_stderr(raw_stderr)
+
+			return (process.returncode, "".join(stdout_lines), filtered_stderr)
 
 		except FileNotFoundError:
 			self.error(ERROR_INTERNAL_ERROR, "nix command not found. Is Nix installed?")
@@ -247,6 +266,33 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			self.percentage(percent)
 		if message:
 			self.status(STATUS_INFO)
+
+	def _filter_nix_stderr(self, stderr: str) -> str:
+		"""
+		Filter out JSON log lines from nix stderr output.
+
+		Nix's internal-json log format outputs JSON objects to stderr.
+		We want to filter these out and only keep actual error messages
+		for display to the user.
+
+		Args:
+		    stderr: Raw stderr output from nix command
+
+		Returns:
+		    Filtered stderr with only human-readable error messages
+		"""
+		filtered_lines = []
+		for line in stderr.splitlines():
+			stripped = line.strip()
+			# Skip JSON log lines (start with @nix or are JSON objects)
+			if stripped.startswith("@nix ") or stripped.startswith('{"action"'):
+				continue
+			# Skip empty lines
+			if not stripped:
+				continue
+			filtered_lines.append(line)
+
+		return "\n".join(filtered_lines)
 
 	def _pkg_to_package_id(self, pkg_name: str, version: str = "", arch: str = "noarch") -> str:
 		"""

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Unit tests for nix_profile_backend module."""
 
+import os
 from unittest import mock
 
 import pytest
 
 
 class TestNixProfileBackendProfileFlag:
-	"""Tests for --profile flag injection in nix commands."""
+	"""Tests for --profile and --impure flag injection in nix commands."""
 
 	@pytest.fixture
 	def mock_backend(self):
@@ -29,7 +30,7 @@ class TestNixProfileBackendProfileFlag:
 						yield backend
 
 	def test_profile_flag_position_install(self, mock_backend):
-		"""Test --profile flag is inserted at correct position for install."""
+		"""Test --profile and --impure flags are inserted at correct position for install."""
 		with mock.patch("subprocess.Popen") as mock_popen:
 			mock_process = mock.MagicMock()
 			mock_process.returncode = 0
@@ -43,16 +44,17 @@ class TestNixProfileBackendProfileFlag:
 			call_args = mock_popen.call_args
 			cmd = call_args[0][0]
 
-			# Command should be: nix profile install --profile /path nixpkgs#firefox --log-format internal-json
+			# Command should be: nix profile install --profile /path --impure nixpkgs#firefox --log-format internal-json
 			assert cmd[0] == "nix"
 			assert cmd[1] == "profile"
 			assert cmd[2] == "install"
 			assert cmd[3] == "--profile"
 			assert cmd[4] == "/home/testuser/.nix-profile"
+			assert cmd[5] == "--impure"
 			assert "nixpkgs#firefox" in cmd
 
 	def test_profile_flag_position_remove(self, mock_backend):
-		"""Test --profile flag is inserted at correct position for remove."""
+		"""Test --profile and --impure flags are inserted at correct position for remove."""
 		with mock.patch("subprocess.Popen") as mock_popen:
 			mock_process = mock.MagicMock()
 			mock_process.returncode = 0
@@ -69,10 +71,11 @@ class TestNixProfileBackendProfileFlag:
 			assert cmd[2] == "remove"
 			assert cmd[3] == "--profile"
 			assert cmd[4] == "/home/testuser/.nix-profile"
+			assert cmd[5] == "--impure"
 			assert "firefox" in cmd
 
 	def test_profile_flag_position_upgrade(self, mock_backend):
-		"""Test --profile flag is inserted at correct position for upgrade."""
+		"""Test --profile and --impure flags are inserted at correct position for upgrade."""
 		with mock.patch("subprocess.Popen") as mock_popen:
 			mock_process = mock.MagicMock()
 			mock_process.returncode = 0
@@ -89,6 +92,7 @@ class TestNixProfileBackendProfileFlag:
 			assert cmd[2] == "upgrade"
 			assert cmd[3] == "--profile"
 			assert cmd[4] == "/home/testuser/.nix-profile"
+			assert cmd[5] == "--impure"
 
 	def test_profile_flag_not_added_to_non_profile_commands(self, mock_backend):
 		"""Test --profile flag is NOT added to non-profile commands."""
@@ -147,7 +151,7 @@ class TestNixProfileBackendCommandConstruction:
 	def test_install_command_full(self):
 		"""Integration test: verify full install command structure."""
 		# This tests the command that would be sent to subprocess
-		# Format should be: nix profile install --profile <path> <installable> --log-format internal-json
+		# Format should be: nix profile install --profile <path> --impure <installable> --log-format internal-json
 
 		args = ["profile", "install", "nixpkgs#librewolf"]
 		cmd = ["nix", *args]
@@ -157,6 +161,7 @@ class TestNixProfileBackendCommandConstruction:
 		if len(args) >= 2 and args[0] == "profile":
 			cmd.insert(3, "--profile")
 			cmd.insert(4, profile_path)
+			cmd.insert(5, "--impure")
 
 		expected = [
 			"nix",
@@ -164,6 +169,7 @@ class TestNixProfileBackendCommandConstruction:
 			"install",
 			"--profile",
 			"/home/user/.nix-profile",
+			"--impure",
 			"nixpkgs#librewolf",
 		]
 
@@ -178,6 +184,7 @@ class TestNixProfileBackendCommandConstruction:
 		if len(args) >= 2 and args[0] == "profile":
 			cmd.insert(3, "--profile")
 			cmd.insert(4, profile_path)
+			cmd.insert(5, "--impure")
 
 		expected = [
 			"nix",
@@ -185,6 +192,7 @@ class TestNixProfileBackendCommandConstruction:
 			"remove",
 			"--profile",
 			"/home/user/.nix-profile",
+			"--impure",
 			"firefox",
 		]
 
@@ -199,6 +207,7 @@ class TestNixProfileBackendCommandConstruction:
 		if len(args) >= 2 and args[0] == "profile":
 			cmd.insert(3, "--profile")
 			cmd.insert(4, profile_path)
+			cmd.insert(5, "--impure")
 
 		expected = [
 			"nix",
@@ -206,6 +215,7 @@ class TestNixProfileBackendCommandConstruction:
 			"upgrade",
 			"--profile",
 			"/nix/var/nix/profiles/per-user/testuser/profile",
+			"--impure",
 			".*",
 		]
 
@@ -221,6 +231,7 @@ class TestNixProfileBackendCommandConstruction:
 		if len(args) >= 2 and args[0] == "profile":
 			cmd.insert(3, "--profile")
 			cmd.insert(4, profile_path)
+			cmd.insert(5, "--impure")
 
 		expected = [
 			"nix",
@@ -228,6 +239,120 @@ class TestNixProfileBackendCommandConstruction:
 			"list",
 			"--profile",
 			"/home/user/.nix-profile",
+			"--impure",
 		]
 
 		assert cmd == expected
+
+
+class TestNixProfileBackendEnvironment:
+	"""Tests for environment variable handling."""
+
+	@pytest.fixture
+	def mock_backend(self):
+		"""Create a mock backend for testing environment handling."""
+		with mock.patch("nix_profile_backend.PackageKitBaseBackend"):
+			with mock.patch("nix_profile_backend.PackagekitPackage"):
+				with mock.patch("nix_profile_backend.NixProfile") as mock_profile:
+					with mock.patch("nix_profile_backend.NixSearch"):
+						mock_profile_instance = mock.MagicMock()
+						mock_profile_instance.profile_path = "/home/testuser/.nix-profile"
+						mock_profile.return_value = mock_profile_instance
+
+						from nix_profile_backend import PackageKitNixProfileBackend
+
+						backend = PackageKitNixProfileBackend([])
+						backend._profile_path = "/home/testuser/.nix-profile"
+						yield backend
+
+	def test_nixpkgs_allow_unfree_passed_to_subprocess(self, mock_backend):
+		"""Test that NIXPKGS_ALLOW_UNFREE is passed to nix subprocess."""
+		with mock.patch("subprocess.Popen") as mock_popen:
+			with mock.patch.dict(os.environ, {"NIXPKGS_ALLOW_UNFREE": "1"}):
+				mock_process = mock.MagicMock()
+				mock_process.returncode = 0
+				mock_process.stderr = []
+				mock_process.communicate.return_value = ("", "")
+				mock_popen.return_value = mock_process
+
+				mock_backend._run_nix_command(["profile", "install", "nixpkgs#google-chrome"])
+
+				# Check that env was passed to Popen
+				call_kwargs = mock_popen.call_args[1]
+				assert "env" in call_kwargs
+				assert call_kwargs["env"].get("NIXPKGS_ALLOW_UNFREE") == "1"
+
+	def test_nixpkgs_allow_insecure_passed_to_subprocess(self, mock_backend):
+		"""Test that NIXPKGS_ALLOW_INSECURE is passed to nix subprocess."""
+		with mock.patch("subprocess.Popen") as mock_popen:
+			with mock.patch.dict(os.environ, {"NIXPKGS_ALLOW_INSECURE": "1"}):
+				mock_process = mock.MagicMock()
+				mock_process.returncode = 0
+				mock_process.stderr = []
+				mock_process.communicate.return_value = ("", "")
+				mock_popen.return_value = mock_process
+
+				mock_backend._run_nix_command(["profile", "upgrade", "some-package"])
+
+				call_kwargs = mock_popen.call_args[1]
+				assert "env" in call_kwargs
+				assert call_kwargs["env"].get("NIXPKGS_ALLOW_INSECURE") == "1"
+
+
+class TestNixProfileBackendStderrFiltering:
+	"""Tests for stderr JSON log filtering."""
+
+	@pytest.fixture
+	def mock_backend(self):
+		"""Create a mock backend for testing stderr filtering."""
+		with mock.patch("nix_profile_backend.PackageKitBaseBackend"):
+			with mock.patch("nix_profile_backend.PackagekitPackage"):
+				with mock.patch("nix_profile_backend.NixProfile") as mock_profile:
+					with mock.patch("nix_profile_backend.NixSearch"):
+						mock_profile_instance = mock.MagicMock()
+						mock_profile_instance.profile_path = "/home/testuser/.nix-profile"
+						mock_profile.return_value = mock_profile_instance
+
+						from nix_profile_backend import PackageKitNixProfileBackend
+
+						backend = PackageKitNixProfileBackend([])
+						backend._profile_path = "/home/testuser/.nix-profile"
+						yield backend
+
+	def test_filter_json_log_lines(self, mock_backend):
+		"""Test that JSON log lines are filtered from stderr."""
+		stderr = """@nix {"action":"start","id":14955076124672,"level":5,"parent":0,"text":"checking 'legacyPackages.x86_64-linux.google-chrome' for updates","type":0}
+@nix {"action":"stop","id":14955076124672}
+error: Package 'google-chrome-144.0.7559.59' has an unfree license ('unfree'), refusing to evaluate."""
+
+		filtered = mock_backend._filter_nix_stderr(stderr)
+
+		assert "@nix" not in filtered
+		assert '{"action"' not in filtered
+		assert "error: Package 'google-chrome-144.0.7559.59' has an unfree license" in filtered
+
+	def test_filter_preserves_real_error_messages(self, mock_backend):
+		"""Test that real error messages are preserved after filtering."""
+		stderr = """@nix {"action":"start","id":123,"text":"building"}
+error: builder for '/nix/store/abc.drv' failed with exit code 1
+@nix {"action":"stop","id":123}
+error: 1 dependencies of derivation failed to build"""
+
+		filtered = mock_backend._filter_nix_stderr(stderr)
+
+		assert "builder for '/nix/store/abc.drv' failed with exit code 1" in filtered
+		assert "1 dependencies of derivation failed to build" in filtered
+		assert "@nix" not in filtered
+
+	def test_filter_empty_stderr(self, mock_backend):
+		"""Test filtering empty stderr."""
+		filtered = mock_backend._filter_nix_stderr("")
+		assert filtered == ""
+
+	def test_filter_only_json_lines(self, mock_backend):
+		"""Test filtering when stderr contains only JSON log lines."""
+		stderr = """@nix {"action":"start","id":1,"text":"test"}
+@nix {"action":"stop","id":1}"""
+
+		filtered = mock_backend._filter_nix_stderr(stderr)
+		assert filtered == ""
