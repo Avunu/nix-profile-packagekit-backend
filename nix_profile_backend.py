@@ -89,7 +89,7 @@ class NixLogParser:
 		Initialize parser with a callback for progress updates.
 
 		Args:
-		    callback: Function to call with progress info: callback(percent, status_msg)
+			callback: Function to call with progress info: callback(percent, status_msg)
 		"""
 		self.callback = callback
 		self.activity_stack = []
@@ -188,12 +188,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		Run a nix command and optionally parse JSON output.
 
 		Args:
-		    args: Command arguments (without 'nix')
-		    parse_json: Whether to use --log-format internal-json
-		    use_profile: Whether to inject --profile flag for profile commands
+			args: Command arguments (without 'nix')
+			parse_json: Whether to use --log-format internal-json
+			use_profile: Whether to inject --profile flag for profile commands
 
 		Returns:
-		    Tuple of (returncode, stdout, stderr)
+			Tuple of (returncode, stdout, stderr)
 		"""
 		cmd = ["nix", *args]
 
@@ -279,10 +279,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		for display to the user.
 
 		Args:
-		    stderr: Raw stderr output from nix command
+			stderr: Raw stderr output from nix command
 
 		Returns:
-		    Filtered stderr with only human-readable error messages
+			Filtered stderr with only human-readable error messages
 		"""
 		filtered_lines = []
 		for line in stderr.splitlines():
@@ -315,10 +315,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		Get package metadata from appdata cache.
 
 		Args:
-		    pkg_name: Package attribute name (e.g., 'firefox', 'python3')
+			pkg_name: Package attribute name (e.g., 'firefox', 'python3')
 
 		Returns:
-		    Dictionary with package metadata or None
+			Dictionary with package metadata or None
 		"""
 		if pkg_name in self._metadata_cache:
 			return self._metadata_cache[pkg_name]
@@ -334,9 +334,9 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		Emit a package with metadata.
 
 		Args:
-		    pkg_name: Package attribute name
-		    version: Package version
-		    info_type: INFO_INSTALLED, INFO_AVAILABLE, etc.
+			pkg_name: Package attribute name
+			version: Package version
+			info_type: INFO_INSTALLED, INFO_AVAILABLE, etc.
 		"""
 		package_id = self._pkg_to_package_id(pkg_name, version)
 
@@ -359,9 +359,9 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		which is faster and more accurate than querying nix-search or AppStream.
 
 		Args:
-		    pkg_name: Package attribute name
-		    version: Package version from manifest
-		    info_type: INFO_INSTALLED, INFO_UPDATING, or INFO_REMOVING
+			pkg_name: Package attribute name
+			version: Package version from manifest
+			info_type: INFO_INSTALLED, INFO_UPDATING, or INFO_REMOVING
 		"""
 		package_id = self._pkg_to_package_id(pkg_name, version)
 		# For installed packages, we emit a simple summary without querying external data

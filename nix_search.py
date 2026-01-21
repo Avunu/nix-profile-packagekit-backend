@@ -30,7 +30,7 @@ class NixSearch:
 		Initialize the nix search wrapper.
 
 		Args:
-		    channel: Channel to search (default: "unstable")
+			channel: Channel to search (default: "unstable")
 		"""
 		self.channel = channel
 		self._cache: dict[str, dict] = {}
@@ -40,11 +40,11 @@ class NixSearch:
 		Search for packages by name/description.
 
 		Args:
-		    terms: Search terms
-		    limit: Maximum results to return
+			terms: Search terms
+			limit: Maximum results to return
 
 		Returns:
-		    Dictionary mapping package attribute names to metadata
+			Dictionary mapping package attribute names to metadata
 		"""
 		results = {}
 		search_query = " ".join(terms)
@@ -195,10 +195,10 @@ class NixSearch:
 		Get detailed info for a specific package.
 
 		Args:
-		    package_name: Package attribute name
+			package_name: Package attribute name
 
 		Returns:
-		    Package metadata or None
+			Package metadata or None
 		"""
 		# Check cache first
 		if package_name in self._cache:
@@ -225,10 +225,10 @@ class NixSearch:
 		Resolve a package name to its attribute path and version.
 
 		Args:
-		    package_name: Package name to resolve
+			package_name: Package name to resolve
 
 		Returns:
-		    Tuple of (attribute_path, version) or None
+			Tuple of (attribute_path, version) or None
 		"""
 		info = self.get_package_info(package_name)
 		if info:

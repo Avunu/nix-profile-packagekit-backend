@@ -32,11 +32,11 @@ with access to nixpkgs source. This avoids runtime dependency on nix-search
 or package building.
 
 Usage:
-    python appstream.py generate --output ./appstream-data
-    python appstream.py info firefox
-    python appstream.py match org.videolan.VLC
-    python appstream.py correlate --report ./correlation-report.json
-    python appstream.py refresh --output ./nixpkgs-apps.json
+	python appstream.py generate --output ./appstream-data
+	python appstream.py info firefox
+	python appstream.py match org.videolan.VLC
+	python appstream.py correlate --report ./correlation-report.json
+	python appstream.py refresh --output ./nixpkgs-apps.json
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ class NixpkgsLoader:
 		Initialize the loader.
 
 		Args:
-		    data_file: Path to prepackaged JSON data
+			data_file: Path to prepackaged JSON data
 		"""
 		self.data_file = data_file
 		self._packages: dict[str, NixPackage] = {}
@@ -143,7 +143,7 @@ class NixpkgsLoader:
 		Load packages from the prepackaged data file.
 
 		Returns:
-		    Dict mapping package attr to NixPackage
+			Dict mapping package attr to NixPackage
 		"""
 		if self._packages:
 			return self._packages
@@ -195,7 +195,7 @@ class FlathubFetcher:
 		Initialize the fetcher.
 
 		Args:
-		    cache_dir: Directory for caching downloaded data
+			cache_dir: Directory for caching downloaded data
 		"""
 		self.cache_dir = cache_dir
 		self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -205,10 +205,10 @@ class FlathubFetcher:
 		Download and cache Flathub AppStream data.
 
 		Args:
-		    max_age_hours: Maximum cache age in hours before re-downloading
+			max_age_hours: Maximum cache age in hours before re-downloading
 
 		Returns:
-		    Path to the decompressed XML file
+			Path to the decompressed XML file
 		"""
 		gz_path = self.cache_dir / "flathub-appstream.xml.gz"
 		xml_path = self.cache_dir / "flathub-appstream.xml"
@@ -237,10 +237,10 @@ class FlathubFetcher:
 		Parse Flathub AppStream XML into components.
 
 		Args:
-		    xml_path: Path to the AppStream XML file
+			xml_path: Path to the AppStream XML file
 
 		Returns:
-		    Dict mapping component ID (desktop ID) to FlathubComponent
+			Dict mapping component ID (desktop ID) to FlathubComponent
 		"""
 		print(f"Parsing {xml_path}...")
 		components: dict[str, FlathubComponent] = {}
@@ -352,12 +352,12 @@ class FlathubFetcher:
 		Download icons for a component.
 
 		Args:
-		    component: FlathubComponent to download icons for
-		    output_dir: Base output directory for icons
-		    sizes: Icon sizes to download (default: ["64x64", "128x128"])
+			component: FlathubComponent to download icons for
+			output_dir: Base output directory for icons
+			sizes: Icon sizes to download (default: ["64x64", "128x128"])
 
 		Returns:
-		    Dict mapping size to downloaded icon path
+			Dict mapping size to downloaded icon path
 		"""
 		if sizes is None:
 			sizes = ["64x64", "128x128"]
@@ -459,11 +459,11 @@ class CorrelationEngine:
 		Known mappings are applied as overrides for cases where auto-matching fails.
 
 		Args:
-		    flathub_components: Dict of flathub_id -> FlathubComponent
-		    nixpkgs_packages: Dict of attr -> NixPackage
+			flathub_components: Dict of flathub_id -> FlathubComponent
+			nixpkgs_packages: Dict of attr -> NixPackage
 
 		Returns:
-		    List of AppStreamMapping objects
+			List of AppStreamMapping objects
 		"""
 		mappings: list[AppStreamMapping] = []
 		matched_flathub_ids: set[str] = set()
@@ -564,7 +564,7 @@ class CorrelationEngine:
 		Find the best matching nixpkgs package for a Flathub component.
 
 		Returns:
-		    Tuple of (NixPackage, confidence, reason) or None
+			Tuple of (NixPackage, confidence, reason) or None
 		"""
 		candidates: list[tuple[NixPackage, float, str]] = []
 
@@ -613,11 +613,11 @@ class CorrelationEngine:
 		- homepage="https://github.com/alainm23/planify" matches io.github.alainm23.planify
 
 		Args:
-		    homepage: Package homepage URL
-		    flathub_parts: Flathub ID split by dots (lowercase)
+			homepage: Package homepage URL
+			flathub_parts: Flathub ID split by dots (lowercase)
 
 		Returns:
-		    True if homepage correlates with Flathub ID
+			True if homepage correlates with Flathub ID
 		"""
 		if not homepage:
 			return False
@@ -707,7 +707,7 @@ class AppStreamGenerator:
 		Initialize the generator.
 
 		Args:
-		    output_dir: Output directory for generated data
+			output_dir: Output directory for generated data
 		"""
 		self.output_dir = output_dir
 		self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -726,14 +726,14 @@ class AppStreamGenerator:
 		Merges Flathub metadata with nixpkgs version/package info.
 
 		Args:
-		    mappings: List of correlations
-		    flathub_components: Flathub component data
-		    nixpkgs_packages: Nixpkgs package data
-		    download_icons: Whether to download icons
-		    fetcher: FlathubFetcher for icon downloads
+			mappings: List of correlations
+			flathub_components: Flathub component data
+			nixpkgs_packages: Nixpkgs package data
+			download_icons: Whether to download icons
+			fetcher: FlathubFetcher for icon downloads
 
 		Returns:
-		    Path to generated catalog
+			Path to generated catalog
 		"""
 		print(f"Generating AppStream catalog with {len(mappings)} components...")
 
@@ -864,12 +864,12 @@ class AppStreamGenerator:
 		Generate a JSON report of the correlation results.
 
 		Args:
-		    mappings: List of correlations
-		    flathub_components: Flathub components for stats
-		    output_path: Optional path to write report
+			mappings: List of correlations
+			flathub_components: Flathub components for stats
+			output_path: Optional path to write report
 
 		Returns:
-		    Report dictionary
+			Report dictionary
 		"""
 		report = {
 			"total_flathub_components": len(flathub_components),
@@ -927,14 +927,14 @@ def generate_appstream(
 	and Flathub components - no package building required!
 
 	Args:
-	    output_dir: Output directory for generated data
-	    cache_dir: Cache directory for downloads
-	    download_icons: Whether to download icons
-	    mappings_file: Optional JSON file with known flathub_id -> attr mappings
-	    nixpkgs_data: Path to prepackaged nixpkgs JSON data
+		output_dir: Output directory for generated data
+		cache_dir: Cache directory for downloads
+		download_icons: Whether to download icons
+		mappings_file: Optional JSON file with known flathub_id -> attr mappings
+		nixpkgs_data: Path to prepackaged nixpkgs JSON data
 
 	Returns:
-	    Path to generated catalog
+		Path to generated catalog
 	"""
 	# Initialize components
 	loader = NixpkgsLoader(nixpkgs_data) if nixpkgs_data else NixpkgsLoader()

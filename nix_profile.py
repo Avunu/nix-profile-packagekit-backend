@@ -44,12 +44,12 @@ class ManifestElementV2(TypedDict, total=False):
 	Package element in manifest v2 format.
 
 	Example:
-	    {
-	        "attrPath": "firefox",
-	        "originalUrl": "flake:nixpkgs",
-	        "storePaths": ["/nix/store/abc123-firefox-122.0"],
-	        "url": "github:NixOS/nixpkgs/..."
-	    }
+		{
+			"attrPath": "firefox",
+			"originalUrl": "flake:nixpkgs",
+			"storePaths": ["/nix/store/abc123-firefox-122.0"],
+			"url": "github:NixOS/nixpkgs/..."
+		}
 	"""
 
 	attrPath: str
@@ -63,15 +63,15 @@ class ManifestElementV3(TypedDict, total=False):
 	Package element in manifest v3 format.
 
 	Example:
-	    {
-	        "active": true,
-	        "attrPath": "legacyPackages.x86_64-linux.firefox",
-	        "originalUrl": "flake:nixpkgs",
-	        "outputs": null,
-	        "priority": 5,
-	        "storePaths": ["/nix/store/abc123-firefox-122.0"],
-	        "url": "path:/nix/store/..."
-	    }
+		{
+			"active": true,
+			"attrPath": "legacyPackages.x86_64-linux.firefox",
+			"originalUrl": "flake:nixpkgs",
+			"outputs": null,
+			"priority": 5,
+			"storePaths": ["/nix/store/abc123-firefox-122.0"],
+			"url": "path:/nix/store/..."
+		}
 	"""
 
 	active: bool
@@ -88,13 +88,13 @@ class ManifestV2(TypedDict, total=False):
 	Manifest format version 2.
 
 	Example:
-	    {
-	        "version": 2,
-	        "elements": [
-	            {"attrPath": "firefox", ...},
-	            {"attrPath": "vim", ...}
-	        ]
-	    }
+		{
+			"version": 2,
+			"elements": [
+				{"attrPath": "firefox", ...},
+				{"attrPath": "vim", ...}
+			]
+		}
 	"""
 
 	version: Literal[1, 2]
@@ -106,13 +106,13 @@ class ManifestV3(TypedDict, total=False):
 	Manifest format version 3 (Nix 2.4+).
 
 	Example:
-	    {
-	        "version": 3,
-	        "elements": {
-	            "firefox": {"active": true, "attrPath": "legacyPackages.x86_64-linux.firefox", ...},
-	            "vim": {"active": true, "attrPath": "legacyPackages.x86_64-linux.vim", ...}
-	        }
-	    }
+		{
+			"version": 3,
+			"elements": {
+				"firefox": {"active": true, "attrPath": "legacyPackages.x86_64-linux.firefox", ...},
+				"vim": {"active": true, "attrPath": "legacyPackages.x86_64-linux.vim", ...}
+			}
+		}
 	"""
 
 	version: Literal[3]
@@ -158,7 +158,7 @@ class NixProfile:
 		Initialize the nix profile manager.
 
 		Args:
-		    profile_path: Path to profile directory. Defaults to ~/.nix-profile
+			profile_path: Path to profile directory. Defaults to ~/.nix-profile
 		"""
 		if profile_path is None:
 			profile_path = self._resolve_user_profile()
@@ -176,7 +176,7 @@ class NixProfile:
 		user's profile instead of root's profile.
 
 		Returns:
-		    Path to the user's nix profile
+			Path to the user's nix profile
 		"""
 		# PackageKit provides the requesting user's UID
 		uid_str = os.environ.get("UID")
@@ -214,8 +214,8 @@ class NixProfile:
 		formats, normalizing v2 to v3 format for consistent downstream processing.
 
 		Returns:
-		    LoadedManifest with normalized elements dict, or None if manifest
-		    doesn't exist or can't be parsed.
+			LoadedManifest with normalized elements dict, or None if manifest
+			doesn't exist or can't be parsed.
 		"""
 		if not self.manifest_path.exists():
 			return None
@@ -280,8 +280,8 @@ class NixProfile:
 		Get all installed packages with their versions.
 
 		Returns:
-		    Dictionary mapping package attribute names to versions.
-		    Example: {'firefox': '122.0', 'vim': '9.0.1'}
+			Dictionary mapping package attribute names to versions.
+			Example: {'firefox': '122.0', 'vim': '9.0.1'}
 		"""
 		loaded = self._load_manifest()
 		if not loaded:
@@ -308,11 +308,11 @@ class NixProfile:
 		Find the profile element identifier for a package.
 
 		Args:
-		    package_name: Package attribute name
+			package_name: Package attribute name
 
 		Returns:
-		    Package key name (str) for use with nix profile remove/upgrade,
-		    or None if not found.
+			Package key name (str) for use with nix profile remove/upgrade,
+			or None if not found.
 		"""
 		loaded = self._load_manifest()
 		if not loaded:
@@ -330,10 +330,10 @@ class NixProfile:
 		Get detailed information about an installed package.
 
 		Args:
-		    package_name: Package attribute name
+			package_name: Package attribute name
 
 		Returns:
-		    PackageInfo dict or None if not found
+			PackageInfo dict or None if not found
 		"""
 		loaded = self._load_manifest()
 		if not loaded:
@@ -356,8 +356,8 @@ class NixProfile:
 		Extract package name from a flake URL.
 
 		Examples:
-		    nixpkgs#firefox -> firefox
-		    github:NixOS/nixpkgs#vim -> vim
+			nixpkgs#firefox -> firefox
+			github:NixOS/nixpkgs#vim -> vim
 		"""
 		if "#" in url:
 			return url.split("#")[-1]
@@ -370,11 +370,11 @@ class NixProfile:
 		Store paths look like: /nix/store/abc123...-package-name-version
 
 		Args:
-		    store_path: Full store path
-		    package_name: Package name to help identify version
+			store_path: Full store path
+			package_name: Package name to help identify version
 
 		Returns:
-		    Version string or 'unknown'
+			Version string or 'unknown'
 		"""
 		try:
 			# Get the last component of the path
@@ -433,10 +433,10 @@ class NixProfile:
 		desktop files and binaries that are useful for launching.
 
 		Args:
-		    package_name: Package attribute name
+			package_name: Package attribute name
 
 		Returns:
-		    List of file paths
+			List of file paths
 		"""
 		info = self.get_package_info(package_name)
 		if not info:
@@ -477,10 +477,10 @@ class NixProfile:
 		Get the primary desktop file for a package.
 
 		Args:
-		    package_name: Package attribute name
+			package_name: Package attribute name
 
 		Returns:
-		    Path to desktop file or None
+			Path to desktop file or None
 		"""
 		info = self.get_package_info(package_name)
 		if not info:

@@ -302,10 +302,12 @@
           inherit (pre-commit-check) shellHook;
 
           packages = [
+            pkgs.appstream # For appstreamcli validation
             pkgs.glib
             pkgs.nix-search-cli
-            pkgs.packagekit
+            pkgs.packagekit # Includes pkcon CLI
             pkgs.pkg-config
+            pkgs.polkit # For pkexec authentication prompts
             pkgs.pyright
             pkgs.ruff
             pythonEnv
