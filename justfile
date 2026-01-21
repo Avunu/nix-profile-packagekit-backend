@@ -52,3 +52,7 @@ generate:
 # Generate without downloading icons
 generate-no-icons:
     python appstream.py generate --output ./appstream-data --no-icons
+
+# Update SBOM
+sbom:
+	nix build .#sbom && cp result ./sbom.json && rm result
