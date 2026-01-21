@@ -213,13 +213,16 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			cmd.extend(["--log-format", "internal-json"])
 
 		# Build environment with NIXPKGS_ALLOW_* variables
-		# This is critical for packages with unfree/insecure licenses
+		# PackageKit runs as a system daemon and doesn't have user environment variables,
+		# so we must explicitly set them to allow unfree/insecure packages
 		env = os.environ.copy()
-		# Ensure common allow flags are passed through
-		for key in list(env.keys()):
-			if key.startswith("NIXPKGS_ALLOW_"):
-				# Keep these in the environment
-				pass
+
+		# Always allow unfree packages (like user's shell environment would)
+		env["NIXPKGS_ALLOW_UNFREE"] = "1"
+
+		# Also allow insecure packages if not already denied
+		if "NIXPKGS_ALLOW_INSECURE" not in env:
+			env["NIXPKGS_ALLOW_INSECURE"] = "1"
 
 		try:
 			process = subprocess.Popen(
@@ -392,7 +395,13 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			else:
 				# Fallback if no metadata
 				self.details(
-					package_id, "Nix package", "unknown", GROUP_UNKNOWN, f"Package {pkg_name}", "", 0
+					package_id,
+					"Nix package",
+					"unknown",
+					GROUP_UNKNOWN,
+					f"Package {pkg_name}",
+					"",
+					0,
 				)
 
 	def _map_category_to_group(self, categories: list[str]) -> str:
@@ -492,7 +501,8 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 	def install_files(self, only_trusted, files):
 		"""Install local .drv or .nix files."""
 		self.error(
-			ERROR_NOT_SUPPORTED, "Installing local files not supported. Use 'nix profile install' directly."
+			ERROR_NOT_SUPPORTED,
+			"Installing local files not supported. Use 'nix profile install' directly.",
 		)
 
 	def install_packages(self, transaction_flags, package_ids):
@@ -518,7 +528,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 				# Re-emit the package as installed
 				self._emit_package(pkg_name, version, INFO_INSTALLED)
 			else:
-				self.error(ERROR_PACKAGE_FAILED_TO_INSTALL, f"Failed to install {pkg_name}: {stderr}")
+				self.error(
+					ERROR_PACKAGE_FAILED_TO_INSTALL,
+					f"Failed to install {pkg_name}: {stderr}",
+				)
 
 	def refresh_cache(self, force):
 		"""Refresh the package cache and appdata."""
@@ -561,7 +574,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 				self.percentage(100)
 				self._emit_package(pkg_name, version, INFO_REMOVING)
 			else:
-				self.error(ERROR_PACKAGE_FAILED_TO_REMOVE, f"Failed to remove {pkg_name}: {stderr}")
+				self.error(
+					ERROR_PACKAGE_FAILED_TO_REMOVE,
+					f"Failed to remove {pkg_name}: {stderr}",
+				)
 
 	def resolve(self, filters, packages):
 		"""Resolve package names to package IDs."""
@@ -753,7 +769,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 				new_version = installed.get(pkg_name, version)
 				self._emit_package(pkg_name, new_version, INFO_UPDATING)
 			else:
-				self.error(ERROR_PACKAGE_FAILED_TO_INSTALL, f"Failed to update {pkg_name}: {stderr}")
+				self.error(
+					ERROR_PACKAGE_FAILED_TO_INSTALL,
+					f"Failed to update {pkg_name}: {stderr}",
+				)
 
 	def update_system(self, transaction_flags):
 		"""Update all packages in the user's nix profile."""
