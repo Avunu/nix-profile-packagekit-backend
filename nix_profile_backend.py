@@ -539,7 +539,7 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			installable = f"nixpkgs#{pkg_name}"
 
 			# Run nix profile install
-			rc, _stdout, stderr = self._run_nix_command(["profile", "install", installable])
+			rc, _stdout, stderr = self._run_nix_command(["profile", "add", installable])
 
 			if rc == 0:
 				self.percentage(100)
