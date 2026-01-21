@@ -830,13 +830,14 @@ class AppStreamGenerator:
 			pkg_attr = pkg_attr[6:]  # len("nixos.") = 6
 		pkgname.text = pkg_attr
 
-		# Update releases with nixpkgs version
+		# Don't include version/releases in AppStream data
+		# Version should come from PackageKit backend dynamically:
+		# - nix-search for available packages
+		# - manifest.json for installed packages
+		# Remove any existing releases section to keep metadata static
 		releases = elem.find("releases")
-		if releases is None:
-			releases = ET.SubElement(elem, "releases")
-		releases.clear()
-		release = ET.SubElement(releases, "release")
-		release.set("version", mapping.nixpkgs_version)
+		if releases is not None:
+			elem.remove(releases)
 
 		# Update icon to local path
 		for icon in elem.findall("icon"):
