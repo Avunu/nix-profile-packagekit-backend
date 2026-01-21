@@ -135,12 +135,7 @@
           appstream-data = pkgs.nixos-appstream-data;
 
           # SBOM generation using bombon (Nix-native CycloneDX SBOM generator)
-          sbom = bombon.lib.${system}.buildBom pkgs.packagekit-backend-nix-profile {
-            meta = {
-              name = "packagekit-backend-nix-profile";
-              version = "1.0.0";
-            };
-          };
+          sbom = bombon.lib.${system}.buildBom pkgs.packagekit-backend-nix-profile { };
         };
 
         # Checks (run with: nix flake check)
