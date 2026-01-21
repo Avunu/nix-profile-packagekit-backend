@@ -351,6 +351,24 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		self.package(package_id, info_type, summary)
 
+	def _emit_installed_package(self, pkg_name: str, version: str, info_type: str = INFO_INSTALLED):
+		"""
+		Emit an installed package using manifest data (no external queries).
+
+		For installed packages, we use data directly from the profile manifest
+		which is faster and more accurate than querying nix-search or AppStream.
+
+		Args:
+		    pkg_name: Package attribute name
+		    version: Package version from manifest
+		    info_type: INFO_INSTALLED, INFO_UPDATING, or INFO_REMOVING
+		"""
+		package_id = self._pkg_to_package_id(pkg_name, version)
+		# For installed packages, we emit a simple summary without querying external data
+		# GNOME Software will correlate with AppStream data by package name
+		summary = ""
+		self.package(package_id, info_type, summary)
+
 	# =========================================================================
 	# PackageKit Backend Methods
 	# =========================================================================
@@ -589,9 +607,9 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		for package_name in packages:
 			if package_name in installed:
-				# Package is installed
+				# Package is installed - use efficient method
 				version = installed[package_name]
-				self._emit_package(package_name, version, INFO_INSTALLED)
+				self._emit_installed_package(package_name, version, INFO_INSTALLED)
 			else:
 				# Check if package exists in nixpkgs via appdata
 				metadata = self._get_package_metadata(package_name)
@@ -797,16 +815,13 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		# Get installed packages
 		installed = self.profile.get_installed_packages()
 
-		# Check filters
-		show_installed = "installed" not in filters or "installed" in filters
-
-		if show_installed:
-			for pkg_name, version in installed.items():
-				self._emit_package(pkg_name, version, INFO_INSTALLED)
-
-		# Getting all available packages could be very slow
-		# For now, just return installed packages
-		# A full implementation would query the appdata database
+		# Emit installed packages efficiently using manifest data only
+		# Note: filters is a list of filter strings like ["~installed", "application"]
+		# "~" prefix means NOT, so "~installed" means "not installed"
+		# For simplicity, just always show installed packages since we don't
+		# have a full available packages database
+		for pkg_name, version in installed.items():
+			self._emit_installed_package(pkg_name, version, INFO_INSTALLED)
 
 		self.percentage(100)
 

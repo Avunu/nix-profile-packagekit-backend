@@ -1,7 +1,7 @@
 {
-  "total_flathub_components": 2862,
+  "total_flathub_components": 2866,
   "total_mappings": 1161,
-  "coverage_percent": 40.56603773584906,
+  "coverage_percent": 40.50942079553385,
   "by_confidence": {
     "override": 0,
     "high": 701,

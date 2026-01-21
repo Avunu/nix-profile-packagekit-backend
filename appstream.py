@@ -819,10 +819,16 @@ class AppStreamGenerator:
 		elem = ET.fromstring(component.raw_xml)
 
 		# Update or add pkgname (nixpkgs attribute)
+		# Strip common prefixes like "nixos." that nix-env -qaP adds but aren't used
+		# in actual package commands like "nix profile install nixpkgs#firefox"
 		pkgname = elem.find("pkgname")
 		if pkgname is None:
 			pkgname = ET.SubElement(elem, "pkgname")
-		pkgname.text = mapping.nixpkgs_attr
+		pkg_attr = mapping.nixpkgs_attr
+		# Remove nixos. prefix if present (from nix-env -qaP output)
+		if pkg_attr.startswith("nixos."):
+			pkg_attr = pkg_attr[6:]  # len("nixos.") = 6
+		pkgname.text = pkg_attr
 
 		# Update releases with nixpkgs version
 		releases = elem.find("releases")
