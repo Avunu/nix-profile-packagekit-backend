@@ -5,6 +5,26 @@
 default:
     @just --list
 
+# Run all tests
+test:
+    python -m pytest tests/ --ignore=tests/test_sbom.py -v
+
+# Run E2E integration tests only
+test-e2e:
+    python -m pytest tests/test_e2e_integration.py -v -s
+
+# Run E2E tests excluding slow tests that require authentication
+test-e2e-fast:
+    python -m pytest tests/test_e2e_integration.py -v -m "not slow"
+
+# Run unit tests only (no E2E)
+test-unit:
+    python -m pytest tests/ --ignore=tests/test_sbom.py --ignore=tests/test_e2e_integration.py -v
+
+# Run a specific test by name pattern
+test-match pattern:
+    python -m pytest tests/ --ignore=tests/test_sbom.py -v -k "{{pattern}}"
+
 # Refresh nixpkgs-apps.json from local nixpkgs store
 refresh:
     python appstream.py refresh --output ./nixpkgs-apps.json
