@@ -356,3 +356,103 @@ error: 1 dependencies of derivation failed to build"""
 
 		filtered = mock_backend._filter_nix_stderr(stderr)
 		assert filtered == ""
+
+
+class TestVersionNormalization:
+	"""Tests for version normalization to handle wrapper suffixes."""
+
+	@pytest.fixture
+	def mock_backend(self):
+		"""Create a mock backend for testing version normalization."""
+		with mock.patch("nix_profile_backend.PackageKitBaseBackend"):
+			with mock.patch("nix_profile_backend.PackagekitPackage"):
+				with mock.patch("nix_profile_backend.NixProfile") as mock_profile:
+					with mock.patch("nix_profile_backend.NixSearch"):
+						mock_profile_instance = mock.MagicMock()
+						mock_profile_instance.profile_path = "/home/testuser/.nix-profile"
+						mock_profile.return_value = mock_profile_instance
+
+						from nix_profile_backend import PackageKitNixProfileBackend
+
+						backend = PackageKitNixProfileBackend([])
+						yield backend
+
+	def test_normalize_wrapped_suffix(self, mock_backend):
+		"""Test that -wrapped suffix is stripped from versions."""
+		assert mock_backend._normalize_version("25.8.2.2-wrapped") == "25.8.2.2"
+		assert mock_backend._normalize_version("1.0.0-wrapped") == "1.0.0"
+		assert mock_backend._normalize_version("131.0.6778.204-wrapped") == "131.0.6778.204"
+
+	def test_normalize_unwrapped_suffix(self, mock_backend):
+		"""Test that -unwrapped suffix is stripped from versions."""
+		assert mock_backend._normalize_version("1.2.3-unwrapped") == "1.2.3"
+
+	def test_normalize_regular_version(self, mock_backend):
+		"""Test that versions without wrapper suffixes are unchanged."""
+		assert mock_backend._normalize_version("1.2.3") == "1.2.3"
+		assert mock_backend._normalize_version("122.0") == "122.0"
+		assert mock_backend._normalize_version("2025.01.22") == "2025.01.22"
+
+	def test_normalize_empty_version(self, mock_backend):
+		"""Test that empty version strings are handled."""
+		assert mock_backend._normalize_version("") == ""
+		assert mock_backend._normalize_version(None) is None
+
+	def test_normalize_version_with_other_suffixes(self, mock_backend):
+		"""Test that other suffixes are NOT stripped (only wrapper suffixes)."""
+		# These should NOT be changed
+		assert mock_backend._normalize_version("1.2.3-beta") == "1.2.3-beta"
+		assert mock_backend._normalize_version("1.2.3-rc1") == "1.2.3-rc1"
+		assert mock_backend._normalize_version("1.2.3-pre") == "1.2.3-pre"
+
+	def test_get_updates_uses_normalized_versions(self, mock_backend):
+		"""Test that get_updates uses normalized versions for comparison."""
+		# Mock the profile to return an installed package
+		mock_backend.profile.get_installed_packages = mock.MagicMock(
+			return_value={"libreoffice-fresh": "25.8.2.2"}
+		)
+
+		# Mock nix_search to return metadata with -wrapped suffix
+		mock_backend.nix_search.get_package_info = mock.MagicMock(
+			return_value={
+				"version": "25.8.2.2-wrapped",
+				"summary": "Office suite",
+			}
+		)
+
+		# Mock the package emission methods
+		mock_backend.status = mock.MagicMock()
+		mock_backend.percentage = mock.MagicMock()
+		mock_backend.allow_cancel = mock.MagicMock()
+		mock_backend.package = mock.MagicMock()
+
+		# Call get_updates
+		mock_backend.get_updates([])
+
+		# Verify that NO update was emitted (because versions match after normalization)
+		mock_backend.package.assert_not_called()
+
+	def test_get_updates_shows_real_updates(self, mock_backend):
+		"""Test that get_updates still shows real updates."""
+		# Mock the profile to return an installed package with an older version
+		mock_backend.profile.get_installed_packages = mock.MagicMock(return_value={"firefox": "122.0"})
+
+		# Mock nix_search to return metadata with newer version
+		mock_backend.nix_search.get_package_info = mock.MagicMock(
+			return_value={
+				"version": "123.0",
+				"summary": "Web browser",
+			}
+		)
+
+		# Mock the package emission methods
+		mock_backend.status = mock.MagicMock()
+		mock_backend.percentage = mock.MagicMock()
+		mock_backend.allow_cancel = mock.MagicMock()
+		mock_backend.package = mock.MagicMock()
+
+		# Call get_updates
+		mock_backend.get_updates([])
+
+		# Verify that an update WAS emitted (because versions differ)
+		mock_backend.package.assert_called_once()

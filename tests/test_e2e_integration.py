@@ -996,6 +996,39 @@ class TestReliability:
 			# Should extract something (may not be exact due to heuristics)
 			assert extracted != "", f"Failed to extract version from {store_path}"
 
+	def test_wrapped_package_version_consistency(self, nix_profile):
+		"""
+		Test that -wrapped packages don't create false update notifications.
+
+		Some packages like libreoffice-fresh have -wrapped suffixes in their
+		store paths, but the version metadata doesn't include this suffix.
+		This test ensures version extraction properly handles these cases.
+		"""
+		test_cases = [
+			# Store path format: /nix/store/hash-package-name-version-wrapped
+			("/nix/store/abc123-libreoffice-fresh-25.8.2.2-wrapped", "libreoffice-fresh", "25.8.2.2"),
+			("/nix/store/abc123-chromium-131.0.6778.204-wrapped", "chromium", "131.0.6778.204"),
+			("/nix/store/abc123-vscode-1.95.3-wrapped", "vscode", "1.95.3"),
+			# Also test without -wrapped suffix
+			("/nix/store/abc123-firefox-122.0", "firefox", "122.0"),
+		]
+
+		for store_path, pkg_name, expected_version in test_cases:
+			extracted = nix_profile._extract_version_from_store_path(store_path, pkg_name)
+
+			# The extracted version should NOT include '-wrapped' suffix
+			assert "-wrapped" not in extracted, (
+				f"Version extracted from {store_path} incorrectly includes '-wrapped' suffix: {extracted}"
+			)
+
+			# The extracted version should match the expected version
+			assert extracted == expected_version, (
+				f"Version mismatch for {pkg_name}:\n"
+				f"  Store path: {store_path}\n"
+				f"  Expected: {expected_version}\n"
+				f"  Extracted: {extracted}"
+			)
+
 
 # =============================================================================
 # Main

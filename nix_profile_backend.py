@@ -310,6 +310,34 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		"""Parse a PackageKit package ID into [name, version, arch, data]."""
 		return split_package_id(package_id)
 
+	def _normalize_version(self, version: str) -> str:
+		"""
+		Normalize a version string by stripping common wrapper suffixes.
+
+		Nix packages often have wrapper suffixes like '-wrapped' that appear in
+		metadata but not in the actual installed version extracted from store paths.
+		This normalizes versions for accurate comparison.
+
+		Args:
+			version: Version string (e.g., "25.8.2.2-wrapped", "1.0.0-unwrapped")
+
+		Returns:
+			Normalized version (e.g., "25.8.2.2", "1.0.0")
+		"""
+		if not version:
+			return version
+
+		# List of common wrapper suffixes to strip
+		wrapper_suffixes = ["-wrapped", "-unwrapped"]
+
+		normalized = version
+		for suffix in wrapper_suffixes:
+			if normalized.endswith(suffix):
+				normalized = normalized[: -len(suffix)]
+				break
+
+		return normalized
+
 	def _get_package_metadata(self, pkg_name: str) -> dict | None:
 		"""
 		Get package metadata from appdata cache.
@@ -506,8 +534,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			if metadata:
 				latest_version = metadata.get("version", "")
 
+				# Normalize both versions to handle wrapper suffixes like -wrapped
+				normalized_current = self._normalize_version(current_version)
+				normalized_latest = self._normalize_version(latest_version)
+
 				# Simple version comparison (nix versions can be complex)
-				if latest_version and latest_version != current_version:
+				if normalized_latest and normalized_latest != normalized_current:
 					package_id = self._pkg_to_package_id(pkg_name, latest_version)
 					summary = metadata.get("summary", "")
 					self.package(package_id, INFO_NORMAL, summary)
