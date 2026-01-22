@@ -163,6 +163,34 @@ class NixSearch:
 
 		return results
 
+	def _normalize_version(self, version: str) -> str:
+		"""
+		Normalize a version string by stripping common wrapper suffixes.
+
+		Nix packages often have wrapper suffixes like '-wrapped' in their metadata
+		that don't appear in the actual installed version. This normalizes versions
+		for consistency with installed packages.
+
+		Args:
+			version: Version string (e.g., "25.8.2.2-wrapped", "1.0.0-unwrapped")
+
+		Returns:
+			Normalized version (e.g., "25.8.2.2", "1.0.0")
+		"""
+		if not version:
+			return version
+
+		# List of common wrapper suffixes to strip
+		wrapper_suffixes = ["-wrapped", "-unwrapped"]
+
+		normalized = version
+		for suffix in wrapper_suffixes:
+			if normalized.endswith(suffix):
+				normalized = normalized[: -len(suffix)]
+				break
+
+		return normalized
+
 	def _parse_package(self, pkg: dict) -> dict:
 		"""Parse nix-search-cli JSON output into our format."""
 		description = pkg.get("package_description", "")
@@ -179,9 +207,13 @@ class NixSearch:
 		if isinstance(homepage, list):
 			homepage = homepage[0] if homepage else ""
 
+		# Get and normalize version
+		raw_version = pkg.get("package_pversion", "unknown")
+		normalized_version = self._normalize_version(raw_version)
+
 		return {
 			"pname": pkg.get("package_pname", pkg.get("package_attr_name", "")),
-			"version": pkg.get("package_pversion", "unknown"),
+			"version": normalized_version,
 			"description": description,
 			"summary": description[:200] if description else "",
 			"homepage": homepage,

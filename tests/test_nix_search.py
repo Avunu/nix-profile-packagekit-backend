@@ -122,3 +122,57 @@ class TestNixSearch:
 		info2 = search.get_package_info("git")
 		assert info2 == info1
 		assert mock_run.call_count == 1  # No additional call
+
+
+class TestVersionNormalization:
+	"""Tests for version normalization in NixSearch."""
+
+	def test_normalize_wrapped_suffix(self):
+		"""Test that -wrapped suffix is stripped from versions."""
+		search = NixSearch()
+		assert search._normalize_version("25.8.2.2-wrapped") == "25.8.2.2"
+		assert search._normalize_version("1.0.0-wrapped") == "1.0.0"
+		assert search._normalize_version("131.0.6778.204-wrapped") == "131.0.6778.204"
+
+	def test_normalize_unwrapped_suffix(self):
+		"""Test that -unwrapped suffix is stripped from versions."""
+		search = NixSearch()
+		assert search._normalize_version("1.2.3-unwrapped") == "1.2.3"
+
+	def test_normalize_regular_version(self):
+		"""Test that versions without wrapper suffixes are unchanged."""
+		search = NixSearch()
+		assert search._normalize_version("1.2.3") == "1.2.3"
+		assert search._normalize_version("122.0") == "122.0"
+		assert search._normalize_version("2025.01.22") == "2025.01.22"
+
+	def test_normalize_empty_version(self):
+		"""Test that empty version strings are handled."""
+		search = NixSearch()
+		assert search._normalize_version("") == ""
+		assert search._normalize_version(None) is None
+
+	def test_normalize_version_with_other_suffixes(self):
+		"""Test that other suffixes are NOT stripped (only wrapper suffixes)."""
+		search = NixSearch()
+		# These should NOT be changed
+		assert search._normalize_version("1.2.3-beta") == "1.2.3-beta"
+		assert search._normalize_version("1.2.3-rc1") == "1.2.3-rc1"
+		assert search._normalize_version("1.2.3-pre") == "1.2.3-pre"
+
+	def test_parse_package_normalizes_version(self):
+		"""Test that _parse_package normalizes versions with wrapper suffixes."""
+		search = NixSearch()
+
+		raw_pkg = {
+			"package_attr_name": "libreoffice-fresh",
+			"package_pname": "libreoffice",
+			"package_pversion": "25.8.2.2-wrapped",
+			"package_description": "Office suite",
+		}
+
+		parsed = search._parse_package(raw_pkg)
+
+		# Version should be normalized (without -wrapped)
+		assert parsed["version"] == "25.8.2.2"
+		assert "-wrapped" not in parsed["version"]

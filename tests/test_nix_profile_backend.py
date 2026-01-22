@@ -358,12 +358,12 @@ error: 1 dependencies of derivation failed to build"""
 		assert filtered == ""
 
 
-class TestVersionNormalization:
-	"""Tests for version normalization to handle wrapper suffixes."""
+class TestGetUpdatesVersionHandling:
+	"""Tests for get_updates with normalized versions from nix_search."""
 
 	@pytest.fixture
 	def mock_backend(self):
-		"""Create a mock backend for testing version normalization."""
+		"""Create a mock backend for testing get_updates."""
 		with mock.patch("nix_profile_backend.PackageKitBaseBackend"):
 			with mock.patch("nix_profile_backend.PackagekitPackage"):
 				with mock.patch("nix_profile_backend.NixProfile") as mock_profile:
@@ -377,45 +377,18 @@ class TestVersionNormalization:
 						backend = PackageKitNixProfileBackend([])
 						yield backend
 
-	def test_normalize_wrapped_suffix(self, mock_backend):
-		"""Test that -wrapped suffix is stripped from versions."""
-		assert mock_backend._normalize_version("25.8.2.2-wrapped") == "25.8.2.2"
-		assert mock_backend._normalize_version("1.0.0-wrapped") == "1.0.0"
-		assert mock_backend._normalize_version("131.0.6778.204-wrapped") == "131.0.6778.204"
-
-	def test_normalize_unwrapped_suffix(self, mock_backend):
-		"""Test that -unwrapped suffix is stripped from versions."""
-		assert mock_backend._normalize_version("1.2.3-unwrapped") == "1.2.3"
-
-	def test_normalize_regular_version(self, mock_backend):
-		"""Test that versions without wrapper suffixes are unchanged."""
-		assert mock_backend._normalize_version("1.2.3") == "1.2.3"
-		assert mock_backend._normalize_version("122.0") == "122.0"
-		assert mock_backend._normalize_version("2025.01.22") == "2025.01.22"
-
-	def test_normalize_empty_version(self, mock_backend):
-		"""Test that empty version strings are handled."""
-		assert mock_backend._normalize_version("") == ""
-		assert mock_backend._normalize_version(None) is None
-
-	def test_normalize_version_with_other_suffixes(self, mock_backend):
-		"""Test that other suffixes are NOT stripped (only wrapper suffixes)."""
-		# These should NOT be changed
-		assert mock_backend._normalize_version("1.2.3-beta") == "1.2.3-beta"
-		assert mock_backend._normalize_version("1.2.3-rc1") == "1.2.3-rc1"
-		assert mock_backend._normalize_version("1.2.3-pre") == "1.2.3-pre"
-
-	def test_get_updates_uses_normalized_versions(self, mock_backend):
-		"""Test that get_updates uses normalized versions for comparison."""
+	def test_get_updates_with_normalized_versions_no_false_positives(self, mock_backend):
+		"""Test that get_updates doesn't show false updates when versions are already normalized."""
 		# Mock the profile to return an installed package
 		mock_backend.profile.get_installed_packages = mock.MagicMock(
 			return_value={"libreoffice-fresh": "25.8.2.2"}
 		)
 
-		# Mock nix_search to return metadata with -wrapped suffix
+		# Mock nix_search to return metadata with normalized version (no -wrapped)
+		# This simulates the fix where nix_search normalizes versions at the source
 		mock_backend.nix_search.get_package_info = mock.MagicMock(
 			return_value={
-				"version": "25.8.2.2-wrapped",
+				"version": "25.8.2.2",  # Already normalized by nix_search
 				"summary": "Office suite",
 			}
 		)
@@ -429,7 +402,7 @@ class TestVersionNormalization:
 		# Call get_updates
 		mock_backend.get_updates([])
 
-		# Verify that NO update was emitted (because versions match after normalization)
+		# Verify that NO update was emitted (because versions match)
 		mock_backend.package.assert_not_called()
 
 	def test_get_updates_shows_real_updates(self, mock_backend):
