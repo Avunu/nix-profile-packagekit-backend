@@ -181,6 +181,47 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		# Lock for thread-safe operations
 		self._lock = threading.Lock()
 
+		# Load local package data for fast resolves (no network)
+		self._local_packages = self._load_local_packages()
+
+	def _load_local_packages(self) -> dict[str, dict]:
+		"""
+		Load nixpkgs-apps.json for fast local package lookups.
+
+		This avoids network calls to search.nixos.org during Resolve,
+		which is critical for GNOME Software startup performance.
+		"""
+		from pathlib import Path
+
+		data_file = Path(__file__).parent / "nixpkgs-apps.json"
+		if not data_file.exists():
+			return {}
+
+		try:
+			with open(data_file) as f:
+				data = json.load(f)
+			return data.get("packages", {})
+		except (OSError, json.JSONDecodeError):
+			return {}
+
+	def _get_local_package_metadata(self, pkg_name: str) -> dict | None:
+		"""
+		Get package metadata from local data (no network).
+
+		Falls back to nix_search if not found locally.
+		"""
+		if pkg_name in self._local_packages:
+			pkg = self._local_packages[pkg_name]
+			return {
+				"pname": pkg.get("pname", pkg_name),
+				"version": pkg.get("version", "unknown"),
+				"description": pkg.get("description", ""),
+				"summary": pkg.get("description", "")[:200],
+				"homepage": pkg.get("homepage", ""),
+				"license": pkg.get("license", "unknown"),
+			}
+		return None
+
 	def _run_nix_command(
 		self, args: list[str], parse_json: bool = True, use_profile: bool = True
 	) -> tuple[int, str, str]:
@@ -612,11 +653,17 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 				version = installed[package_name]
 				self._emit_installed_package(package_name, version, INFO_INSTALLED)
 			else:
-				# Check if package exists in nixpkgs via appdata
-				metadata = self._get_package_metadata(package_name)
+				# Check local data first (fast, no network)
+				metadata = self._get_local_package_metadata(package_name)
 				if metadata:
 					version = metadata.get("version", "unknown")
 					self._emit_package(package_name, version, INFO_AVAILABLE)
+				else:
+					# Fall back to network search for packages not in local data
+					metadata = self._get_package_metadata(package_name)
+					if metadata:
+						version = metadata.get("version", "unknown")
+						self._emit_package(package_name, version, INFO_AVAILABLE)
 
 	def search_details(self, filters, values):
 		"""Search package descriptions."""
@@ -807,24 +854,77 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		else:
 			self.error(ERROR_PACKAGE_FAILED_TO_INSTALL, f"Failed to upgrade profile: {stderr}")
 
+	def _parse_filters(self, filters) -> set[str]:
+		"""
+		Parse PackageKit filter string into a set.
+
+		Filters come as semicolon-separated strings like "installed;application"
+		or as a list. The "~" prefix means NOT (e.g., "~installed" = not installed).
+		"none" means no filters.
+		"""
+		if isinstance(filters, list):
+			return set(filters)
+		if not filters or filters == "none":
+			return set()
+		return set(filters.split(";"))
+
 	def get_packages(self, filters):
 		"""Get all packages (installed and available)."""
 		self.status(STATUS_QUERY)
 		self.percentage(0)
 		self.allow_cancel(True)
 
-		# Get installed packages
-		installed = self.profile.get_installed_packages()
+		filter_set = self._parse_filters(filters)
+		want_installed = "~installed" not in filter_set
+		want_available = "installed" not in filter_set
 
-		# Emit installed packages efficiently using manifest data only
-		# Note: filters is a list of filter strings like ["~installed", "application"]
-		# "~" prefix means NOT, so "~installed" means "not installed"
-		# For simplicity, just always show installed packages since we don't
-		# have a full available packages database
-		for pkg_name, version in installed.items():
-			self._emit_installed_package(pkg_name, version, INFO_INSTALLED)
+		# Emit installed packages from manifest data
+		if want_installed:
+			installed = self.profile.get_installed_packages()
+			for pkg_name, version in installed.items():
+				self._emit_installed_package(pkg_name, version, INFO_INSTALLED)
+
+		# Emit available packages from AppStream data (pre-generated, no network)
+		# GNOME Software needs this to populate the Explore page
+		if want_available:
+			self._emit_available_from_appstream(filters)
 
 		self.percentage(100)
+
+	def _emit_available_from_appstream(self, filters):
+		"""
+		Emit available packages using pre-generated AppStream data.
+
+		Reads the nixpkgs-apps.json to provide available package listings
+		without making network calls. This is critical for GNOME Software's
+		Explore page.
+		"""
+		from pathlib import Path
+
+		nixpkgs_data = Path(__file__).parent / "nixpkgs-apps.json"
+		if not nixpkgs_data.exists():
+			return
+
+		try:
+			with open(nixpkgs_data) as f:
+				data = json.load(f)
+		except (OSError, json.JSONDecodeError):
+			return
+
+		installed = self.profile.get_installed_packages()
+		packages = data.get("packages", {})
+
+		for attr, pkg_data in packages.items():
+			if attr in installed:
+				continue  # Already emitted as installed
+
+			pkg_name = pkg_data.get("pname", attr)
+			version = pkg_data.get("version", "unknown")
+			package_id = self._pkg_to_package_id(pkg_name, version)
+			summary = pkg_data.get("description", "")
+			if len(summary) > 100:
+				summary = summary[:97] + "..."
+			self.package(package_id, INFO_AVAILABLE, summary)
 
 
 def main():

@@ -849,8 +849,12 @@ class AppStreamGenerator:
 				icon.get("height", "128")
 				icon.text = f"{component.id}.png"
 
-		# If we have nixpkgs-specific info, we could override description etc.
-		# But generally we defer to Flathub's richer metadata
+		# Remove <bundle type="flatpak"> elements inherited from Flathub.
+		# GNOME Software uses <bundle> to route components to plugins — if it
+		# sees "flatpak" it bypasses PackageKit entirely. Removing it forces
+		# GNOME Software to use <pkgname> correlation with the PackageKit backend.
+		for bundle in elem.findall("bundle"):
+			elem.remove(bundle)
 
 		return ET.tostring(elem, encoding="unicode")
 
