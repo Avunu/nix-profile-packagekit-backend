@@ -164,6 +164,17 @@
           ]);
         in
         {
+          pre-commit.settings.hooks = {
+            ruff.enable = true;
+            ruff-format.enable = true;
+            nixfmt.enable = true;
+            trim-trailing-whitespace.enable = true;
+            end-of-file-fixer.enable = true;
+            check-json.enable = true;
+            check-toml.enable = true;
+            check-yaml.enable = true;
+          };
+
           packages = {
             default = pkgsWithOverlay.packagekit-backend-nix-profile;
             backend = pkgsWithOverlay.packagekit-backend-nix-profile;
@@ -321,167 +332,169 @@
             };
           };
 
-          devenv.shells.default =
-            { config, pkgs, ... }:
-            {
-              packages = [
-                pkgsWithOverlay.appstream
-                pkgsWithOverlay.glib
-                pkgsWithOverlay.nix-search-cli
-                pkgsWithOverlay.packagekit
-                pkgsWithOverlay.pkg-config
-                pkgsWithOverlay.polkit
-                pkgsWithOverlay.pyright
-                pkgsWithOverlay.ruff
-                pythonEnv
-              ];
+          devenv.shells.default = {
+            packages = [
+              pkgsWithOverlay.appstream
+              pkgsWithOverlay.glib
+              pkgsWithOverlay.nix-search-cli
+              pkgsWithOverlay.packagekit
+              pkgsWithOverlay.pkg-config
+              pkgsWithOverlay.polkit
+              pkgsWithOverlay.pre-commit
+              pkgsWithOverlay.pyright
+              pkgsWithOverlay.ruff
+              pythonEnv
+            ];
 
-              scripts = {
-                test = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python -m pytest tests/ --ignore=tests/test_sbom.py -v "$@"
-                  '';
-                  description = "Run all tests (unit + e2e)";
-                };
-                test-unit = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python -m pytest tests/ --ignore=tests/test_sbom.py --ignore=tests/test_e2e_integration.py -v "$@"
-                  '';
-                  description = "Run unit tests only";
-                };
-                test-e2e = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python -m pytest tests/test_e2e_integration.py -v -s "$@"
-                  '';
-                  description = "Run E2E integration tests";
-                };
-                test-e2e-fast = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python -m pytest tests/test_e2e_integration.py -v -m "not slow" "$@"
-                  '';
-                  description = "Run E2E tests excluding slow tests";
-                };
-                test-match = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    if [ -z "$1" ]; then
-                      echo "Usage: test-match <pattern>"
-                      exit 1
-                    fi
-                    python -m pytest tests/ --ignore=tests/test_sbom.py -v -k "$1"
-                  '';
-                  description = "Run tests matching a pattern";
-                };
-                refresh = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python appstream.py refresh --output ./nixpkgs-apps.json
-                  '';
-                  description = "Refresh nixpkgs-apps.json from local nixpkgs";
-                };
-                refresh-from = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    if [ -z "$1" ]; then
-                      echo "Usage: refresh-from <nixpkgs-path>"
-                      exit 1
-                    fi
-                    python appstream.py refresh --output ./nixpkgs-apps.json --nixpkgs "$1"
-                  '';
-                  description = "Refresh nixpkgs-apps.json from a specific nixpkgs path";
-                };
-                match = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    if [ -z "$1" ]; then
-                      echo "Usage: match <flathub-id>"
-                      exit 1
-                    fi
-                    python appstream.py match "$1"
-                  '';
-                  description = "Test correlation for a specific Flathub ID";
-                };
-                info = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    if [ -z "$1" ]; then
-                      echo "Usage: info <package>"
-                      exit 1
-                    fi
-                    python appstream.py info "$1"
-                  '';
-                  description = "Show info about a nixpkgs package";
-                };
-                correlate = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python appstream.py correlate --report ./correlation-report.json
-                  '';
-                  description = "Run full correlation analysis and generate report";
-                };
-                generate = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python appstream.py generate --output ./appstream-data
-                  '';
-                  description = "Generate AppStream catalog (downloads icons, creates XML)";
-                };
-                generate-no-icons = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    python appstream.py generate --output ./appstream-data --no-icons
-                  '';
-                  description = "Generate AppStream catalog without downloading icons";
-                };
-                sbom = {
-                  exec = ''
-                    #!/usr/bin/env bash
-                    set -e
-                    cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                    nix build .#sbom && cp result ./sbom.json && rm result
-                  '';
-                  description = "Generate SBOM";
-                };
+            enterShell = ''
+              # Install git-hooks-nix managed pre-commit hooks
+              ${config.pre-commit.installationScript}
+            '';
+
+            scripts = {
+              pre-commit-run = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  # Run pre-commit hooks
+                  pre-commit run --all-files
+                '';
+                description = "Run pre-commit hooks on all files";
+              };
+
+              test = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python -m pytest tests/ --ignore=tests/test_sbom.py -v "$@"
+                '';
+                description = "Run all tests (unit + e2e)";
+              };
+              test-unit = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python -m pytest tests/ --ignore=tests/test_sbom.py --ignore=tests/test_e2e_integration.py -v "$@"
+                '';
+                description = "Run unit tests only";
+              };
+              test-e2e = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python -m pytest tests/test_e2e_integration.py -v -s "$@"
+                '';
+                description = "Run E2E integration tests";
+              };
+              test-e2e-fast = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python -m pytest tests/test_e2e_integration.py -v -m "not slow" "$@"
+                '';
+                description = "Run E2E tests excluding slow tests";
+              };
+              test-match = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  if [ -z "$1" ]; then
+                    echo "Usage: test-match <pattern>"
+                    exit 1
+                  fi
+                  python -m pytest tests/ --ignore=tests/test_sbom.py -v -k "$1"
+                '';
+                description = "Run tests matching a pattern";
+              };
+              refresh = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python appstream.py refresh --output ./nixpkgs-apps.json
+                '';
+                description = "Refresh nixpkgs-apps.json from local nixpkgs";
+              };
+              refresh-from = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  if [ -z "$1" ]; then
+                    echo "Usage: refresh-from <nixpkgs-path>"
+                    exit 1
+                  fi
+                  python appstream.py refresh --output ./nixpkgs-apps.json --nixpkgs "$1"
+                '';
+                description = "Refresh nixpkgs-apps.json from a specific nixpkgs path";
+              };
+              match = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  if [ -z "$1" ]; then
+                    echo "Usage: match <flathub-id>"
+                    exit 1
+                  fi
+                  python appstream.py match "$1"
+                '';
+                description = "Test correlation for a specific Flathub ID";
+              };
+              info = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  if [ -z "$1" ]; then
+                    echo "Usage: info <package>"
+                    exit 1
+                  fi
+                  python appstream.py info "$1"
+                '';
+                description = "Show info about a nixpkgs package";
+              };
+              correlate = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python appstream.py correlate --report ./correlation-report.json
+                '';
+                description = "Run full correlation analysis and generate report";
+              };
+              generate = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python appstream.py generate --output ./appstream-data
+                '';
+                description = "Generate AppStream catalog (downloads icons, creates XML)";
+              };
+              generate-no-icons = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  python appstream.py generate --output ./appstream-data --no-icons
+                '';
+                description = "Generate AppStream catalog without downloading icons";
+              };
+              sbom = {
+                exec = ''
+                  #!/usr/bin/env bash
+                  set -e
+                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                  nix build .#sbom && cp result ./sbom.json && rm result
+                '';
+                description = "Generate SBOM";
               };
             };
-
-          pre-commit.settings.hooks = {
-            ruff.enable = true;
-            ruff-format.enable = true;
-            nixfmt.enable = true;
-            trim-trailing-whitespace.enable = true;
-            end-of-file-fixer.enable = true;
-            check-json.enable = true;
-            check-toml.enable = true;
-            check-yaml.enable = true;
           };
 
           formatter = pkgsWithOverlay.nixfmt-rfc-style;
