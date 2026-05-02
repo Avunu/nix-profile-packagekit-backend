@@ -181,8 +181,19 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		# Lock for thread-safe operations
 		self._lock = threading.Lock()
 
-		# Load local package data for fast resolves (no network)
-		self._local_packages = self._load_local_packages()
+		# Local package data is loaded lazily to avoid 22MB JSON parse
+		# on every backend spawn (adds ~3s). Only loaded when needed for
+		# get_packages or get_details, not for Resolve.
+		self._local_packages = None
+		self._local_packages_loaded = False
+
+	@property
+	def local_packages(self) -> dict[str, dict]:
+		"""Lazy-load local package data on first access."""
+		if not self._local_packages_loaded:
+			self._local_packages = self._load_local_packages()
+			self._local_packages_loaded = True
+		return self._local_packages or {}
 
 	def _load_local_packages(self) -> dict[str, dict]:
 		"""
@@ -190,6 +201,10 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		This avoids network calls to search.nixos.org during Resolve,
 		which is critical for GNOME Software startup performance.
+
+		The data file has keys like "nixos.firefox" from nix-env -qaP output,
+		but PackageKit uses bare attr names like "firefox". We normalize keys
+		and also index by pname for flexible lookups.
 		"""
 		from pathlib import Path
 
@@ -200,9 +215,25 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		try:
 			with open(data_file) as f:
 				data = json.load(f)
-			return data.get("packages", {})
 		except (OSError, json.JSONDecodeError):
 			return {}
+
+		# Build normalized index: strip "nixos." prefix and index by both
+		# attr name and pname for flexible lookups
+		normalized = {}
+		for attr, pkg_data in data.get("packages", {}).items():
+			# Strip nixos. prefix (from nix-env -qaP output)
+			bare_attr = attr.removeprefix("nixos.")
+			normalized[bare_attr] = pkg_data
+
+			# Also index by pname if different from attr
+			pname = pkg_data.get("pname", "")
+			if pname and pname != bare_attr:
+				# Only add pname mapping if not already taken by another package
+				if pname not in normalized:
+					normalized[pname] = pkg_data
+
+		return normalized
 
 	def _get_local_package_metadata(self, pkg_name: str) -> dict | None:
 		"""
@@ -210,8 +241,8 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		Falls back to nix_search if not found locally.
 		"""
-		if pkg_name in self._local_packages:
-			pkg = self._local_packages[pkg_name]
+		if pkg_name in self.local_packages:
+			pkg = self.local_packages[pkg_name]
 			return {
 				"pname": pkg.get("pname", pkg_name),
 				"version": pkg.get("version", "unknown"),
@@ -653,17 +684,12 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 				version = installed[package_name]
 				self._emit_installed_package(package_name, version, INFO_INSTALLED)
 			else:
-				# Check local data first (fast, no network)
-				metadata = self._get_local_package_metadata(package_name)
-				if metadata:
-					version = metadata.get("version", "unknown")
-					self._emit_package(package_name, version, INFO_AVAILABLE)
-				else:
-					# Fall back to network search for packages not in local data
-					metadata = self._get_package_metadata(package_name)
-					if metadata:
-						version = metadata.get("version", "unknown")
-						self._emit_package(package_name, version, INFO_AVAILABLE)
+				# Emit as available immediately. GNOME Software only calls Resolve
+				# for packages it already found in AppStream — it just needs
+				# confirmation the package exists and whether it's installed.
+				# No need to load 22MB of local data or make network calls.
+				package_id = self._pkg_to_package_id(package_name, "")
+				self.package(package_id, INFO_AVAILABLE, "")
 
 	def search_details(self, filters, values):
 		"""Search package descriptions."""
@@ -893,34 +919,23 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 	def _emit_available_from_appstream(self, filters):
 		"""
-		Emit available packages using pre-generated AppStream data.
+		Emit available packages using the already-loaded local package data.
 
-		Reads the nixpkgs-apps.json to provide available package listings
-		without making network calls. This is critical for GNOME Software's
-		Explore page.
+		Uses the same data loaded at startup by _load_local_packages,
+		avoiding redundant file I/O.
 		"""
-		from pathlib import Path
-
-		nixpkgs_data = Path(__file__).parent / "nixpkgs-apps.json"
-		if not nixpkgs_data.exists():
-			return
-
-		try:
-			with open(nixpkgs_data) as f:
-				data = json.load(f)
-		except (OSError, json.JSONDecodeError):
+		if not self.local_packages:
 			return
 
 		installed = self.profile.get_installed_packages()
-		packages = data.get("packages", {})
 
-		for attr, pkg_data in packages.items():
+		for attr, pkg_data in self.local_packages.items():
 			if attr in installed:
 				continue  # Already emitted as installed
 
-			pkg_name = pkg_data.get("pname", attr)
+			pname = pkg_data.get("pname", attr)
 			version = pkg_data.get("version", "unknown")
-			package_id = self._pkg_to_package_id(pkg_name, version)
+			package_id = self._pkg_to_package_id(pname, version)
 			summary = pkg_data.get("description", "")
 			if len(summary) > 100:
 				summary = summary[:97] + "..."

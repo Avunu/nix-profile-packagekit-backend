@@ -34,6 +34,11 @@ let
       (toPythonModule packagekit)
     ];
 
+    # Bundle nixpkgs-apps.json alongside the Python modules for fast local lookups
+    postInstall = ''
+      cp $src/nixpkgs-apps.json $out/${python3.sitePackages}/
+    '';
+
     makeWrapperArgs = [
       "--prefix"
       "PATH"

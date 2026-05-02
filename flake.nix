@@ -10,6 +10,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    git-hooks-nix = {
+      url = "github:cachix/git-hooks.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # PackageKit source for backend headers and Python library
     packagekit-src = {
       url = "github:PackageKit/PackageKit/v1.3.0";
@@ -33,9 +38,8 @@
       self,
       nixpkgs,
       flake-parts,
-      devenv,
-      packagekit-src,
       bombon,
+      packagekit-src,
       ...
     }:
     let
@@ -92,6 +96,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         inputs.devenv.flakeModule
+        inputs.git-hooks-nix.flakeModule
       ];
 
       systems = [
@@ -331,17 +336,6 @@
                 pythonEnv
               ];
 
-              pre-commit.hooks = {
-                ruff.enable = true;
-                ruff-format.enable = true;
-                nixfmt.enable = true;
-                trim-trailing-whitespace.enable = true;
-                end-of-file-fixer.enable = true;
-                check-json.enable = true;
-                check-toml.enable = true;
-                check-yaml.enable = true;
-              };
-
               scripts = {
                 test = {
                   exec = ''
@@ -478,6 +472,17 @@
                 };
               };
             };
+
+          pre-commit.settings.hooks = {
+            ruff.enable = true;
+            ruff-format.enable = true;
+            nixfmt.enable = true;
+            trim-trailing-whitespace.enable = true;
+            end-of-file-fixer.enable = true;
+            check-json.enable = true;
+            check-toml.enable = true;
+            check-yaml.enable = true;
+          };
 
           formatter = pkgsWithOverlay.nixfmt-rfc-style;
         };

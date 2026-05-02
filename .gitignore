@@ -19,6 +19,7 @@ __pycache__/
 *.a
 
 # direnv-generated (regenerated on shell entry)
+.devenv/
 .direnv/
 .venv/
 .vscode/
