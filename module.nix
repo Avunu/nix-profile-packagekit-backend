@@ -85,7 +85,7 @@ in
         };
         path = with pkgs; [
           nix
-          backend
+          nix-search
         ];
         script = ''
           nix-search --index --flake nixpkgs --index-path /var/cache/nix-search

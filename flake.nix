@@ -65,6 +65,9 @@
           # The backend .so and helper scripts
           packagekit-backend-nix-profile = backend;
 
+          # nix-search binary for the systemd index-building service
+          nix-search = nix-search.packages.${final.system}.default;
+
           # AppStream data generator - generates metadata by correlating nixpkgs with Flathub
           nixos-appstream-data = final.callPackage ./appstream-package.nix { };
         };
@@ -82,6 +85,9 @@
         in
         {
           packagekit-backend-nix-profile = backend;
+
+          # nix-search binary for the systemd index-building service
+          nix-search = nix-search.packages.${final.system}.default;
 
           # Override packagekit to include our backend in its lib directory
           packagekit = prev.packagekit.overrideAttrs (oldAttrs: {
