@@ -6,7 +6,7 @@
   glib,
   packagekit,
   nix,
-  nix-search-cli,
+  nix-search,
   packagekitSrc,
 }:
 let
@@ -34,18 +34,13 @@ let
       (toPythonModule packagekit)
     ];
 
-    # Bundle nixpkgs-apps.json alongside the Python modules for fast local lookups
-    postInstall = ''
-      cp $src/nixpkgs-apps.json $out/${python3.sitePackages}/
-    '';
-
     makeWrapperArgs = [
       "--prefix"
       "PATH"
       ":"
       "${lib.makeBinPath [
         nix
-        nix-search-cli
+        nix-search
       ]}"
     ];
 

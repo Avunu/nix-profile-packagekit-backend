@@ -2,37 +2,41 @@
 #
 # Licensed under the GNU General Public License Version 2
 #
-# Nix search integration for PackageKit backend using nix-search-cli
+# Nix search integration for PackageKit backend using diamondburned/nix-search
 
 """
-Module for searching nixpkgs packages using nix-search-cli.
+Module for searching nixpkgs packages using a local nix-search index.
 
-Uses search.nixos.org ElasticSearch index via nix-search-cli for instant results.
-https://github.com/peterldowns/nix-search-cli
+Uses diamondburned/nix-search with a pre-built Bluge full-text index for
+instant offline results (~33ms). The index is built from the flake registry's
+nixpkgs by a background systemd timer.
+
+https://github.com/diamondburned/nix-search
 """
 
 import json
 import subprocess
 
+# Default index path (system-wide, built by systemd timer)
+DEFAULT_INDEX_PATH = "/var/cache/nix-search"
+
 
 class NixSearch:
 	"""
-	Search nixpkgs using nix-search-cli (queries search.nixos.org).
+	Search nixpkgs using diamondburned/nix-search with a local index.
 
-	This is much faster than `nix search` because it uses a pre-built
-	ElasticSearch index rather than evaluating nixpkgs.
-
-	Requires nix-search-cli to be installed (bundled via flake.nix).
+	The index is pre-built by a systemd timer from the flake registry's nixpkgs.
+	Searches are fully offline and take ~33ms.
 	"""
 
-	def __init__(self, channel: str = "unstable"):
+	def __init__(self, index_path: str = DEFAULT_INDEX_PATH):
 		"""
 		Initialize the nix search wrapper.
 
 		Args:
-			channel: Channel to search (default: "unstable")
+			index_path: Path to the nix-search index directory
 		"""
-		self.channel = channel
+		self.index_path = index_path
 		self._cache: dict[str, dict] = {}
 
 	def search(self, terms: list[str], limit: int = 100) -> dict[str, dict]:
@@ -46,130 +50,92 @@ class NixSearch:
 		Returns:
 			Dictionary mapping package attribute names to metadata
 		"""
-		results = {}
 		search_query = " ".join(terms)
+		if not search_query:
+			return {}
 
-		try:
-			cmd = [
-				"nix-search",
-				"--search",
-				search_query,
-				"--channel",
-				self.channel,
-				"--max-results",
-				str(limit),
-				"--json",
-			]
-
-			result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-			if result.returncode != 0:
-				print(f"nix-search failed: {result.stderr}")
-				return {}
-
-			# Parse JSON lines output
-			for line in result.stdout.strip().split("\n"):
-				if not line:
-					continue
-				try:
-					pkg = json.loads(line)
-					attr_name = pkg.get("package_attr_name", "")
-					if not attr_name:
-						continue
-
-					results[attr_name] = self._parse_package(pkg)
-
-				except json.JSONDecodeError:
-					continue
-
-		except subprocess.TimeoutExpired:
-			print("nix-search timed out")
-		except Exception as e:
-			print(f"Error during nix-search: {e}")
+		packages = self._run_search(search_query)
+		# Limit results
+		results = {}
+		for pkg in packages[:limit]:
+			attr_name = self._extract_attr(pkg)
+			if attr_name:
+				results[attr_name] = self._parse_package(pkg)
 
 		return results
 
 	def search_by_name(self, name: str, limit: int = 20) -> dict[str, dict]:
-		"""Search by package attribute name."""
+		"""Search by package attribute name (exact match)."""
+		packages = self._run_search(name, exact=True)
+
 		results = {}
-
-		try:
-			cmd = [
-				"nix-search",
-				"--name",
-				name,
-				"--channel",
-				self.channel,
-				"--max-results",
-				str(limit),
-				"--json",
-			]
-
-			result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-			if result.returncode != 0:
-				return {}
-
-			for line in result.stdout.strip().split("\n"):
-				if not line:
-					continue
-				try:
-					pkg = json.loads(line)
-					attr_name = pkg.get("package_attr_name", "")
-					if attr_name:
-						results[attr_name] = self._parse_package(pkg)
-				except json.JSONDecodeError:
-					continue
-
-		except Exception as e:
-			print(f"Error during nix-search: {e}")
+		for pkg in packages[:limit]:
+			attr_name = self._extract_attr(pkg)
+			if attr_name:
+				results[attr_name] = self._parse_package(pkg)
 
 		return results
 
-	def search_by_program(self, program: str, limit: int = 20) -> dict[str, dict]:
-		"""Search by installed program name."""
-		results = {}
+	def _run_search(self, query: str, exact: bool = False) -> list[dict]:
+		"""
+		Run nix-search and return parsed JSON results.
+
+		Args:
+			query: Search query string
+			exact: Whether to use exact matching
+
+		Returns:
+			List of raw package dicts from nix-search JSON output
+		"""
+		cmd = [
+			"nix-search",
+			"--index-path",
+			self.index_path,
+			"--json",
+			"--no-color",
+			"--no-pager",
+		]
+
+		if exact:
+			cmd.append("--exact")
+
+		cmd.append(query)
 
 		try:
-			cmd = [
-				"nix-search",
-				"--program",
-				program,
-				"--channel",
-				self.channel,
-				"--max-results",
-				str(limit),
-				"--json",
-			]
-
-			result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+			result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
 			if result.returncode != 0:
-				return {}
+				return []
 
-			for line in result.stdout.strip().split("\n"):
-				if not line:
-					continue
-				try:
-					pkg = json.loads(line)
-					attr_name = pkg.get("package_attr_name", "")
-					if attr_name:
-						results[attr_name] = self._parse_package(pkg)
-				except json.JSONDecodeError:
-					continue
+			# Output is a JSON array
+			packages = json.loads(result.stdout)
+			if isinstance(packages, list):
+				return packages
+			return []
 
-		except Exception as e:
-			print(f"Error during nix-search: {e}")
+		except subprocess.TimeoutExpired:
+			return []
+		except (json.JSONDecodeError, Exception):
+			return []
 
-		return results
+	def _extract_attr(self, pkg: dict) -> str:
+		"""
+		Extract the package attribute name from nix-search output.
+
+		The 'path' field is like "nixpkgs#firefox" — we want "firefox".
+		Falls back to 'name' field.
+		"""
+		path = pkg.get("path", "")
+		if "#" in path:
+			return path.split("#", 1)[1]
+		return pkg.get("name", "")
 
 	def _normalize_version(self, version: str) -> str:
 		"""
 		Normalize a version string by stripping common wrapper suffixes.
 
 		Nix packages often have wrapper suffixes like '-wrapped' in their metadata
-		that don't appear in the actual installed version. This normalizes versions
-		for consistency with installed packages.
+		that don't appear in the actual installed version.
 
 		Args:
 			version: Version string (e.g., "25.8.2.2-wrapped", "1.0.0-unwrapped")
@@ -180,7 +146,6 @@ class NixSearch:
 		if not version:
 			return version
 
-		# List of common wrapper suffixes to strip
 		wrapper_suffixes = ["-wrapped", "-unwrapped"]
 
 		normalized = version
@@ -192,34 +157,28 @@ class NixSearch:
 		return normalized
 
 	def _parse_package(self, pkg: dict) -> dict:
-		"""Parse nix-search-cli JSON output into our format."""
-		description = pkg.get("package_description", "")
+		"""Parse nix-search JSON output into our internal format."""
+		description = pkg.get("description", "")
 
 		# Format license
-		license_info = pkg.get("package_license", [])
-		if license_info and isinstance(license_info, list):
-			license_str = license_info[0].get("fullName", "unknown") if license_info else "unknown"
+		licenses = pkg.get("license", [])
+		if licenses and isinstance(licenses, list):
+			license_str = licenses[0]
 		else:
 			license_str = "unknown"
 
-		# Format homepage
-		homepage = pkg.get("package_homepage", [])
-		if isinstance(homepage, list):
-			homepage = homepage[0] if homepage else ""
-
 		# Get and normalize version
-		raw_version = pkg.get("package_pversion", "unknown")
+		raw_version = pkg.get("version", "unknown")
 		normalized_version = self._normalize_version(raw_version)
 
 		return {
-			"pname": pkg.get("package_pname", pkg.get("package_attr_name", "")),
+			"pname": pkg.get("name", self._extract_attr(pkg)),
 			"version": normalized_version,
 			"description": description,
 			"summary": description[:200] if description else "",
-			"homepage": homepage,
+			"homepage": "",  # Not available in nix-search index
 			"license": license_str,
-			"programs": pkg.get("package_programs", []),
-			"outputs": pkg.get("package_outputs", ["out"]),
+			"mainProgram": pkg.get("mainProgram", ""),
 		}
 
 	def get_package_info(self, package_name: str) -> dict | None:
@@ -237,14 +196,14 @@ class NixSearch:
 			return self._cache[package_name]
 
 		# Search by exact name
-		results = self.search_by_name(package_name, limit=5)
+		results = self.search_by_name(package_name, limit=10)
 
 		# Look for exact match
 		if package_name in results:
 			self._cache[package_name] = results[package_name]
 			return results[package_name]
 
-		# Try partial match
+		# Try pname match
 		for _name, info in results.items():
 			if info.get("pname") == package_name:
 				self._cache[package_name] = info

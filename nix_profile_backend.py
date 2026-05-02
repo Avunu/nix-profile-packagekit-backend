@@ -181,78 +181,6 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 		# Lock for thread-safe operations
 		self._lock = threading.Lock()
 
-		# Local package data is loaded lazily to avoid 22MB JSON parse
-		# on every backend spawn (adds ~3s). Only loaded when needed for
-		# get_packages or get_details, not for Resolve.
-		self._local_packages = None
-		self._local_packages_loaded = False
-
-	@property
-	def local_packages(self) -> dict[str, dict]:
-		"""Lazy-load local package data on first access."""
-		if not self._local_packages_loaded:
-			self._local_packages = self._load_local_packages()
-			self._local_packages_loaded = True
-		return self._local_packages or {}
-
-	def _load_local_packages(self) -> dict[str, dict]:
-		"""
-		Load nixpkgs-apps.json for fast local package lookups.
-
-		This avoids network calls to search.nixos.org during Resolve,
-		which is critical for GNOME Software startup performance.
-
-		The data file has keys like "nixos.firefox" from nix-env -qaP output,
-		but PackageKit uses bare attr names like "firefox". We normalize keys
-		and also index by pname for flexible lookups.
-		"""
-		from pathlib import Path
-
-		data_file = Path(__file__).parent / "nixpkgs-apps.json"
-		if not data_file.exists():
-			return {}
-
-		try:
-			with open(data_file) as f:
-				data = json.load(f)
-		except (OSError, json.JSONDecodeError):
-			return {}
-
-		# Build normalized index: strip "nixos." prefix and index by both
-		# attr name and pname for flexible lookups
-		normalized = {}
-		for attr, pkg_data in data.get("packages", {}).items():
-			# Strip nixos. prefix (from nix-env -qaP output)
-			bare_attr = attr.removeprefix("nixos.")
-			normalized[bare_attr] = pkg_data
-
-			# Also index by pname if different from attr
-			pname = pkg_data.get("pname", "")
-			if pname and pname != bare_attr:
-				# Only add pname mapping if not already taken by another package
-				if pname not in normalized:
-					normalized[pname] = pkg_data
-
-		return normalized
-
-	def _get_local_package_metadata(self, pkg_name: str) -> dict | None:
-		"""
-		Get package metadata from local data (no network).
-
-		Falls back to nix_search if not found locally.
-		"""
-		if pkg_name in self.local_packages:
-			pkg = self.local_packages[pkg_name]
-			return {
-				"pname": pkg.get("pname", pkg_name),
-				"version": pkg.get("version", "unknown"),
-				"description": pkg.get("description", ""),
-				"summary": pkg.get("description", "")[:200],
-				"homepage": pkg.get("homepage", ""),
-				"license": pkg.get("license", "unknown"),
-			}
-		return None
-
 	def _run_nix_command(
 		self, args: list[str], parse_json: bool = True, use_profile: bool = True
 	) -> tuple[int, str, str]:
@@ -902,7 +830,6 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 
 		filter_set = self._parse_filters(filters)
 		want_installed = "~installed" not in filter_set
-		want_available = "installed" not in filter_set
 
 		# Emit installed packages from manifest data
 		if want_installed:
@@ -910,36 +837,11 @@ class PackageKitNixProfileBackend(PackageKitBaseBackend, PackagekitPackage):
 			for pkg_name, version in installed.items():
 				self._emit_installed_package(pkg_name, version, INFO_INSTALLED)
 
-		# Emit available packages from AppStream data (pre-generated, no network)
-		# GNOME Software needs this to populate the Explore page
-		if want_available:
-			self._emit_available_from_appstream(filters)
+		# Available packages are discovered via AppStream catalog (generated
+		# separately) — GNOME Software uses AppStream for browsing/categories,
+		# not get-packages. No need to emit available packages here.
 
 		self.percentage(100)
-
-	def _emit_available_from_appstream(self, filters):
-		"""
-		Emit available packages using the already-loaded local package data.
-
-		Uses the same data loaded at startup by _load_local_packages,
-		avoiding redundant file I/O.
-		"""
-		if not self.local_packages:
-			return
-
-		installed = self.profile.get_installed_packages()
-
-		for attr, pkg_data in self.local_packages.items():
-			if attr in installed:
-				continue  # Already emitted as installed
-
-			pname = pkg_data.get("pname", attr)
-			version = pkg_data.get("version", "unknown")
-			package_id = self._pkg_to_package_id(pname, version)
-			summary = pkg_data.get("description", "")
-			if len(summary) > 100:
-				summary = summary[:97] + "..."
-			self.package(package_id, INFO_AVAILABLE, summary)
 
 
 def main():

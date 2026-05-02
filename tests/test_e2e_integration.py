@@ -158,7 +158,7 @@ def check_required_tools():
 		"appstreamcli": "appstream package",
 		"pkcon": "packagekit package",
 		"nix": "nix package manager",
-		"nix-search": "nix-search-cli package",
+		"nix-search": "diamondburned/nix-search package",
 	}
 
 	for tool, desc in tools.items():

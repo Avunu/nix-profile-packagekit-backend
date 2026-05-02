@@ -75,6 +75,32 @@ in
           DefaultBackend = "nix-profile";
         };
       };
+
+      # Background index builder for nix-search (fully offline package search)
+      # Rebuilds the Bluge full-text index from the flake registry's nixpkgs
+      systemd.services.nix-search-index = {
+        description = "Rebuild nix-search package index from nixpkgs";
+        serviceConfig = {
+          Type = "oneshot";
+        };
+        path = with pkgs; [
+          nix
+          backend
+        ];
+        script = ''
+          nix-search --index --flake nixpkgs --index-path /var/cache/nix-search
+        '';
+      };
+
+      systemd.timers.nix-search-index = {
+        description = "Periodic rebuild of nix-search package index";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "5min";
+          OnUnitActiveSec = "1d";
+          Persistent = true;
+        };
+      };
     }
 
     # Runtime bind mount approach - avoids rebuilding KDE/GNOME packages

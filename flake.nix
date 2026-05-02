@@ -26,6 +26,12 @@
       url = "github:nikstur/bombon";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Offline package search with local Bluge index
+    nix-search = {
+      url = "github:diamondburned/nix-search";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   nixConfig = {
@@ -39,6 +45,7 @@
       nixpkgs,
       flake-parts,
       bombon,
+      nix-search,
       packagekit-src,
       ...
     }:
@@ -51,6 +58,7 @@
           backend = final.callPackage ./package.nix {
             packagekitSrc = packagekit-src;
             packagekit = prev.packagekit;
+            nix-search = nix-search.packages.${final.system}.default;
           };
         in
         {
@@ -69,6 +77,7 @@
           backend = final.callPackage ./package.nix {
             packagekitSrc = packagekit-src;
             packagekit = prev.packagekit;
+            nix-search = nix-search.packages.${final.system}.default;
           };
         in
         {
@@ -336,7 +345,7 @@
             packages = [
               pkgsWithOverlay.appstream
               pkgsWithOverlay.glib
-              pkgsWithOverlay.nix-search-cli
+              nix-search.packages.${system}.default
               pkgsWithOverlay.packagekit
               pkgsWithOverlay.pkg-config
               pkgsWithOverlay.polkit
