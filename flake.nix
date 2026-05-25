@@ -5,11 +5,6 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
-    devenv = {
-      url = "github:cachix/devenv";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     git-hooks-nix = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -32,11 +27,6 @@
       url = "github:diamondburned/nix-search";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-  };
-
-  nixConfig = {
-    extra-trusted-public-keys = "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw=";
-    extra-substituters = "https://devenv.cachix.org";
   };
 
   outputs =
@@ -110,7 +100,6 @@
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
-        inputs.devenv.flakeModule
         inputs.git-hooks-nix.flakeModule
       ];
 
@@ -347,7 +336,7 @@
             };
           };
 
-          devenv.shells.default = {
+          devShells.default = pkgsWithOverlay.mkShell {
             packages = [
               pkgsWithOverlay.appstream
               pkgsWithOverlay.glib
@@ -359,157 +348,95 @@
               pkgsWithOverlay.pyright
               pkgsWithOverlay.ruff
               pythonEnv
+              (pkgsWithOverlay.writeShellScriptBin "pre-commit-run" ''
+                pre-commit run --all-files
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "test" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python -m pytest tests/ --ignore=tests/test_sbom.py -v "$@"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "test-unit" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python -m pytest tests/ --ignore=tests/test_sbom.py --ignore=tests/test_e2e_integration.py -v "$@"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "test-e2e" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python -m pytest tests/test_e2e_integration.py -v -s "$@"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "test-e2e-fast" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python -m pytest tests/test_e2e_integration.py -v -m "not slow" "$@"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "test-match" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                if [ -z "$1" ]; then
+                  echo "Usage: test-match <pattern>"
+                  exit 1
+                fi
+                python -m pytest tests/ --ignore=tests/test_sbom.py -v -k "$1"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "refresh" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python appstream.py refresh --output ./nixpkgs-apps.json
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "refresh-from" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                if [ -z "$1" ]; then
+                  echo "Usage: refresh-from <nixpkgs-path>"
+                  exit 1
+                fi
+                python appstream.py refresh --output ./nixpkgs-apps.json --nixpkgs "$1"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "match" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                if [ -z "$1" ]; then
+                  echo "Usage: match <flathub-id>"
+                  exit 1
+                fi
+                python appstream.py match "$1"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "info" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                if [ -z "$1" ]; then
+                  echo "Usage: info <package>"
+                  exit 1
+                fi
+                python appstream.py info "$1"
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "correlate" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python appstream.py correlate --report ./correlation-report.json
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "generate" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python appstream.py generate --output ./appstream-data
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "generate-no-icons" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                python appstream.py generate --output ./appstream-data --no-icons
+              '')
+              (pkgsWithOverlay.writeShellScriptBin "sbom" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+                nix build .#sbom && cp result ./sbom.json && rm result
+              '')
             ];
 
-            enterShell = ''
-              # Install git-hooks-nix managed pre-commit hooks
+            shellHook = ''
               ${config.pre-commit.installationScript}
             '';
-
-            scripts = {
-              pre-commit-run = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  # Run pre-commit hooks
-                  pre-commit run --all-files
-                '';
-                description = "Run pre-commit hooks on all files";
-              };
-
-              test = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python -m pytest tests/ --ignore=tests/test_sbom.py -v "$@"
-                '';
-                description = "Run all tests (unit + e2e)";
-              };
-              test-unit = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python -m pytest tests/ --ignore=tests/test_sbom.py --ignore=tests/test_e2e_integration.py -v "$@"
-                '';
-                description = "Run unit tests only";
-              };
-              test-e2e = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python -m pytest tests/test_e2e_integration.py -v -s "$@"
-                '';
-                description = "Run E2E integration tests";
-              };
-              test-e2e-fast = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python -m pytest tests/test_e2e_integration.py -v -m "not slow" "$@"
-                '';
-                description = "Run E2E tests excluding slow tests";
-              };
-              test-match = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  if [ -z "$1" ]; then
-                    echo "Usage: test-match <pattern>"
-                    exit 1
-                  fi
-                  python -m pytest tests/ --ignore=tests/test_sbom.py -v -k "$1"
-                '';
-                description = "Run tests matching a pattern";
-              };
-              refresh = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python appstream.py refresh --output ./nixpkgs-apps.json
-                '';
-                description = "Refresh nixpkgs-apps.json from local nixpkgs";
-              };
-              refresh-from = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  if [ -z "$1" ]; then
-                    echo "Usage: refresh-from <nixpkgs-path>"
-                    exit 1
-                  fi
-                  python appstream.py refresh --output ./nixpkgs-apps.json --nixpkgs "$1"
-                '';
-                description = "Refresh nixpkgs-apps.json from a specific nixpkgs path";
-              };
-              match = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  if [ -z "$1" ]; then
-                    echo "Usage: match <flathub-id>"
-                    exit 1
-                  fi
-                  python appstream.py match "$1"
-                '';
-                description = "Test correlation for a specific Flathub ID";
-              };
-              info = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  if [ -z "$1" ]; then
-                    echo "Usage: info <package>"
-                    exit 1
-                  fi
-                  python appstream.py info "$1"
-                '';
-                description = "Show info about a nixpkgs package";
-              };
-              correlate = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python appstream.py correlate --report ./correlation-report.json
-                '';
-                description = "Run full correlation analysis and generate report";
-              };
-              generate = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python appstream.py generate --output ./appstream-data
-                '';
-                description = "Generate AppStream catalog (downloads icons, creates XML)";
-              };
-              generate-no-icons = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  python appstream.py generate --output ./appstream-data --no-icons
-                '';
-                description = "Generate AppStream catalog without downloading icons";
-              };
-              sbom = {
-                exec = ''
-                  #!/usr/bin/env bash
-                  set -e
-                  cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-                  nix build .#sbom && cp result ./sbom.json && rm result
-                '';
-                description = "Generate SBOM";
-              };
-            };
           };
 
           formatter = pkgsWithOverlay.nixfmt-rfc-style;
