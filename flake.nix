@@ -5,11 +5,6 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
 
-    git-hooks-nix = {
-      url = "github:cachix/git-hooks.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # PackageKit source for backend headers and Python library
     packagekit-src = {
       url = "github:PackageKit/PackageKit/v1.3.0";
@@ -99,10 +94,6 @@
         };
     in
     flake-parts.lib.mkFlake { inherit inputs; } {
-      imports = [
-        inputs.git-hooks-nix.flakeModule
-      ];
-
       systems = [
         "x86_64-linux"
         "aarch64-linux"
@@ -149,7 +140,6 @@
 
       perSystem =
         {
-          config,
           system,
           pkgs,
           ...
@@ -168,17 +158,6 @@
           ]);
         in
         {
-          pre-commit.settings.hooks = {
-            ruff.enable = true;
-            ruff-format.enable = true;
-            nixfmt.enable = true;
-            trim-trailing-whitespace.enable = true;
-            end-of-file-fixer.enable = true;
-            check-json.enable = true;
-            check-toml.enable = true;
-            check-yaml.enable = true;
-          };
-
           packages = {
             default = pkgsWithOverlay.packagekit-backend-nix-profile;
             backend = pkgsWithOverlay.packagekit-backend-nix-profile;
@@ -344,12 +323,12 @@
               pkgsWithOverlay.packagekit
               pkgsWithOverlay.pkg-config
               pkgsWithOverlay.polkit
-              pkgsWithOverlay.pre-commit
+              pkgsWithOverlay.prek
               pkgsWithOverlay.pyright
               pkgsWithOverlay.ruff
               pythonEnv
               (pkgsWithOverlay.writeShellScriptBin "pre-commit-run" ''
-                pre-commit run --all-files
+                prek run --all-files
               '')
               (pkgsWithOverlay.writeShellScriptBin "test" ''
                 set -e
@@ -433,10 +412,6 @@
                 nix build .#sbom && cp result ./sbom.json && rm result
               '')
             ];
-
-            shellHook = ''
-              ${config.pre-commit.installationScript}
-            '';
           };
 
           formatter = pkgsWithOverlay.nixfmt-rfc-style;
