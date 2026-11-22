@@ -1,1 +1,53 @@
-/nix/store/glllnw79g0yhqgx3mhd67xvaa696iybn-pre-commit-config.json
+# Git hooks, run by prek. Committing needs no nix:
+#   uv tool install prek
+#   prek install
+# Tool versions match the nixpkgs revision in flake.lock (ruff 0.15.13,
+# pre-commit-hooks 6.0.0) that the nix-managed hooks used.
+# The nixfmt hook builds nixfmt from source with cabal and GHC (language:
+# haskell).
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.13
+    hooks:
+      # Old scope and command (git-hooks.nix ruff and ruff-format): staged
+      # Python files only, with `ruff check --fix` and `ruff format`.
+      # types_or: [] drops the published pyi and jupyter types. entry drops
+      # the published --force-exclude, which the old hooks did not use.
+      - id: ruff-check
+        entry: ruff check
+        args: [--fix]
+        types: [python]
+        types_or: []
+        stages: [pre-commit]
+      - id: ruff-format
+        entry: ruff format
+        types: [python]
+        types_or: []
+        stages: [pre-commit]
+  - repo: https://github.com/NixOS/nixfmt
+    rev: v1.2.0
+    hooks:
+      # Old scope (git-hooks.nix nixfmt): files matching \.nix$ and the
+      # default types [file]. types replaces the published [nix], which
+      # does not match a file named only .nix. Hook id nixfmt, not
+      # nixfmt-nix, which runs through nix.
+      - id: nixfmt
+        files: \.nix$
+        types: [file]
+        stages: [pre-commit]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        stages: [pre-commit, pre-push, manual]
+      - id: end-of-file-fixer
+        stages: [pre-commit]
+      - id: check-json
+        stages: [pre-commit]
+      - id: check-toml
+        stages: [pre-commit]
+      - id: check-yaml
+        args: [--multi]
+        stages: [pre-commit]

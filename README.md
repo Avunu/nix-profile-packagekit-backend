@@ -197,6 +197,10 @@ services.packagekit.backends.nix-profile = {
 ## Development
 
 ```bash
+# Install the git hooks (no nix needed)
+uv tool install prek
+prek install
+
 # Enter dev shell
 nix develop
 
