@@ -7,7 +7,7 @@
 
     # PackageKit source for backend headers and Python library
     packagekit-src = {
-      url = "github:PackageKit/PackageKit/v1.3.0";
+      url = "github:PackageKit/PackageKit/v1.4.0";
       flake = false;
     };
 
