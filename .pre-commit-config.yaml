@@ -9,7 +9,7 @@ default_install_hook_types: [pre-commit, pre-push]
 default_stages: [pre-commit]
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.13
+    rev: v0.17.5
     hooks:
       # Old scope and command (git-hooks.nix ruff and ruff-format): staged
       # Python files only, with `ruff check --fix` and `ruff format`.
@@ -27,7 +27,7 @@ repos:
         types_or: []
         stages: [pre-commit]
   - repo: https://github.com/NixOS/nixfmt
-    rev: v1.2.0
+    rev: v1.5.0
     hooks:
       # Old scope (git-hooks.nix nixfmt): files matching \.nix$ and the
       # default types [file]. types replaces the published [nix], which
